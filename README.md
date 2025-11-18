@@ -21,11 +21,35 @@ A powerful web application for uploading videos and streaming them using HLS, DA
 
 ## Prerequisites
 
-- Python 3.7+
-- FFmpeg
-- Node.js and npm (for frontend dependencies)
+- Docker and Docker Compose (recommended)
+- Or manually:
+  - Python 3.7+
+  - FFmpeg
+  - Node.js and npm (for frontend dependencies)
 
-## Installation
+## Docker Installation (Recommended)
+
+1. **Clone the repository** (if not already done):
+   ```bash
+   git clone https://github.com/YebinLeee/Streaming_project.git
+   cd Streaming_project
+   ```
+
+2. **Build and start the containers**:
+   ```bash
+   docker-compose up --build
+   ```
+
+3. **Access the application**:
+   - Web interface: http://localhost:8000
+   - API documentation: http://localhost:8000/docs
+
+4. **Stopping the application**:
+   ```bash
+   docker-compose down
+   ```
+
+## Manual Installation
 
 1. Clone the repository:
    ```bash
@@ -89,6 +113,23 @@ A powerful web application for uploading videos and streaming them using HLS, DA
 | MPEG-DASH (mpd/ts)    | X  | O        | X   |
 | RTSP (MPEG-2 TS)    | X  | X        | O   |
 | CMAF (m3u8/ts/mpd/ts)         | O  | O        | X   |
+
+## Docker Configuration
+
+The Docker setup includes:
+
+- **Ports**:
+  - `8000`: Web interface and API
+  - `8554`: RTSP streaming port
+
+- **Volumes**:
+  - `./uploads`: Uploaded video files
+  - `./static/output`: Processed streaming files
+
+- **Environment Variables**:
+  - `UPLOAD_DIR`: Directory for uploaded files (default: `/app/uploads`)
+  - `OUTPUT_DIR`: Directory for processed files (default: `/app/static/output`)
+  - `RTSP_PORT`: RTSP streaming port (default: `8554`)
 
 ## Project Structure
 
