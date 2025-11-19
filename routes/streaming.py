@@ -43,8 +43,9 @@ async def get_stream(task_id: int):
                     if f.endswith(('.m4s', '.mpd', '.init.mp4'))
                 ]
         
-        # Get the base URL path
-        file_base = os.path.splitext(os.path.basename(task['input']))[0]
+        # Get the base URL path - extract from the actual input file path
+        input_filename = os.path.basename(task['input'])
+        file_base = os.path.splitext(input_filename)[0]
         base_url = f"/static/output/{file_base}"
         
         # Create response with stream information

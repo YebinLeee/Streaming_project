@@ -23,14 +23,14 @@ async def upload_video(
         os.makedirs(UPLOAD_DIR, exist_ok=True)
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         
-        # Create output directory based on input filename (without extension)
+        # Create output directory based on input filename (without extension) with unique ID
         file_base = os.path.splitext(file.filename)[0]
-        output_dir = os.path.join(OUTPUT_DIR, file_base)
+        unique_id = str(uuid.uuid4())[:8]
+        output_dir = os.path.join(OUTPUT_DIR, f"{file_base}_{unique_id}")
         os.makedirs(output_dir, exist_ok=True)
         
         # Save the uploaded file with a unique name to avoid conflicts
         file_ext = os.path.splitext(file.filename)[1]
-        unique_id = str(uuid.uuid4())[:8]
         saved_filename = f"{file_base}_{unique_id}{file_ext}"
         file_path = os.path.join(UPLOAD_DIR, saved_filename)
         
@@ -44,11 +44,42 @@ async def upload_video(
         print(f"File saved successfully. Size: {os.path.getsize(file_path)} bytes")
         
         # Set output path based on format
+        # Frontend sends: hls, ts, cmaf, dash
+        # - hls           -> HLS (.m3u8)
+        # - ts            -> HLS (.m3u8) but RTSP 프로토콜에서 사용 (TS 기반)
+        # - cmaf + hls    -> HLS (.m3u8) 로 취급 (CMAF-HLS 조합)
+        # - cmaf + dash   -> DASH (.mpd)
+        # - dash          -> DASH (.mpd)
+
+        original_media_format = media_format
+
         if media_format == 'hls':
+            media_format = 'hls'
             output_path = os.path.join(output_dir, 'playlist.m3u8')
+        elif media_format == 'ts':
+            # TS 포맷은 내부적으로 HLS 파이프라인을 사용하되,
+            # 스트리밍 프로토콜에서 RTSP 를 선택하도록 UI에서 제한함.
+            media_format = 'hls'
+            output_path = os.path.join(output_dir, 'playlist.m3u8')
+        elif media_format == 'cmaf':
+            # CMAF + HLS  -> HLS(.m3u8)
+            # CMAF + DASH -> DASH(.mpd) in 'dash' subdirectory
+            if streaming_protocol == 'hls':
+                media_format = 'hls'
+                output_path = os.path.join(output_dir, 'playlist.m3u8')
+            else:
+                media_format = 'dash'
+                dash_dir = os.path.join(output_dir, 'dash')
+                os.makedirs(dash_dir, exist_ok=True)
+                output_path = os.path.join(dash_dir, 'playlist.mpd')
         elif media_format == 'dash':
-            output_path = os.path.join(output_dir, 'playlist.mpd')
+            # DASH -> DASH(.mpd) in 'dash' subdirectory
+            media_format = 'dash'
+            dash_dir = os.path.join(output_dir, 'dash')
+            os.makedirs(dash_dir, exist_ok=True)
+            output_path = os.path.join(dash_dir, 'playlist.mpd')
         else:
+            # fallback: mp4 파일 그대로 저장하는 경우 등
             output_path = os.path.join(output_dir, 'output.mp4')
             
         print(f"Output will be saved to: {output_path}")

@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Streaming App</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Load HLS.js with fallback -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.12/dist/hls.min.js" onerror="console.error('Failed to load HLS.js')"></script>
+    <!-- Load Dash.js -->
+    <script src="https://cdn.dashjs.org/latest/dash.all.min.js" onerror="console.error('Failed to load Dash.js')"></script>
+    <script>
+        // Check if HLS is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof Hls === 'undefined') {
+                console.error('HLS.js failed to load. Please check your internet connection.');
+                alert('Error: HLS.js library failed to load. Please check your internet connection and refresh the page.');
+            } else {
+                console.log('HLS.js loaded successfully');
+            }
+        });
+    </script>
+    <script>
+        // Check if Hls is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.Hls) {
+                console.log('Hls.js loaded successfully');
+            } else {
+                console.error('Hls.js failed to load');
+            }
+        });
+    </script>
+    <style>
+        .player-container {
+            max-width: 1024px;
+            margin: 0 auto;
+            display: none;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        #videoElement {
+            width: 100%;
+            height: auto;
+            max-height: 70vh;
+            display: block;
+        }
+        .opacity-50 {
+            opacity: 0.5;
+        }
+        .cursor-not-allowed {
+            cursor: not-allowed;
+        }
+        .transition-opacity {
+            transition: opacity 0.2s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold text-center mb-8">Video Streaming App</h1>
+        
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">Upload Video</h2>
+            <form id="uploadForm" class="space-y-4">
+                <div>
+                    <label class="block text-gray-700 mb-2" for="videoFile">Select Video File (MP4)</label>
+                    <input type="file" id="videoFile" accept="video/mp4" class="w-full p-2 border rounded" required>
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 mb-2">Media Format</label>
+                    <div class="space-x-4">
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="mediaFormat" value="m3u8" class="form-radio" checked>
+                            <span class="ml-2">HLS (m3u8/ts)</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="mediaFormat" value="ts" class="form-radio">
+                            <span class="ml-2">TS</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="mediaFormat" value="fmp4" class="form-radio">
+                            <span class="ml-2">fMP4/MPD</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="mediaFormat" value="cmaf" class="form-radio">
+                            <span class="ml-2">CMAF</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 mb-2">Streaming Protocol</label>
+                    <div class="space-x-4">
+                        <label id="protocolHLSLabel" for="protocolHLS" class="inline-flex items-center transition-opacity">
+                            <input type="radio" id="protocolHLS" name="streamingProtocol" value="hls" class="form-radio" checked>
+                            <span class="ml-2">HLS</span>
+                        </label>
+                        <label id="protocolDASHLabel" for="protocolDASH" class="inline-flex items-center transition-opacity">
+                            <input type="radio" id="protocolDASH" name="streamingProtocol" value="dash" class="form-radio">
+                            <span class="ml-2">MPEG-DASH</span>
+                        </label>
+                        <label id="protocolRTSPLabel" for="protocolRTSP" class="inline-flex items-center transition-opacity">
+                            <input type="radio" id="protocolRTSP" name="streamingProtocol" value="rtsp" class="form-radio">
+                            <span class="ml-2">RTSP</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">
+                    Upload & Convert
+                </button>
+            </form>
+        </div>
+        
+        <div id="status" class="hidden bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-8" role="alert">
+            <p id="statusMessage">Processing your video...</p>
+        </div>
+        
+        <div class="flex flex-col md:flex-row gap-8">
+            <div id="playerContainer" class="hidden mt-8">
+                <div id="playerInfo" class="mb-4 p-2 bg-gray-100 rounded"></div>
+                <div class="relative w-full max-w-4xl mx-auto bg-black rounded-lg overflow-hidden">
+                    <video 
+                        id="videoElement" 
+                        class="w-full h-auto" 
+                        controls 
+                        playsinline 
+                        preload="auto"
+                        style="display: block;"
+                    >
+                        Your browser does not support the video tag.
+                    </video>
+                    <div id="playerOverlay" class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 cursor-pointer hidden">
+                        <button id="playButton" class="bg-white bg-opacity-75 hover:bg-opacity-100 rounded-full p-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-md p-4 w-full md:w-80 h-fit">
+                <h3 class="text-lg font-semibold mb-3">Stream Information</h3>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Current Chunk:</span>
+                        <span id="currentChunk" class="font-mono">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Bitrate:</span>
+                        <span id="currentBitrate" class="font-mono">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Resolution:</span>
+                        <span id="currentResolution" class="font-mono">-</span>
+                    </div>
+                    <div class="pt-2 mt-2 border-t">
+                            <div class="font-medium mb-1">Resolution Control</div>
+                            <div class="flex flex-wrap gap-2 mb-3" id="resolutionControls">
+                                <button onclick="setResolution(0)" class="px-3 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200 transition">Auto</button>
+                                <button onclick="setResolution(1)" class="px-3 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200 transition">270p</button>
+                                <button onclick="setResolution(2)" class="px-3 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200 transition">360p</button>
+                                <button onclick="setResolution(3)" class="px-3 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200 transition">480p</button>
+                                <button onclick="setResolution(4)" class="px-3 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200 transition">1080p</button>
+                            </div>
+                            
+                            <div class="flex justify-between items-center mb-1">
+                                <div class="font-medium">Recent Chunks:</div>
+                                <button onclick="clearChunkHistory()" class="text-xs text-blue-500 hover:underline">Clear</button>
+                            </div>
+                            <div id="chunkHistory" class="space-y-1 max-h-64 overflow-y-auto mb-4 text-xs border rounded p-2 bg-gray-50">
+                                <!-- Chunks will be added here dynamically -->
+                            </div>
+                            <div id="chunkDetails" class="hidden mt-4 p-3 border rounded bg-gray-50 text-xs">
+                                <div class="flex justify-between items-center mb-2">
+                                    <h4 class="font-medium">Chunk Details</h4>
+                                    <div class="flex space-x-2">
+                                        <button id="viewRawBtn" class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" disabled>
+                                            View Raw
+                                        </button>
+                                        <button id="downloadChunkBtn" class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200" disabled>
+                                            Download
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="chunkDetailContent" class="space-y-2">
+                                    <p class="text-gray-500">Click on a chunk to view its details</p>
+                                </div>
+                                <div id="chunkContentViewer" class="mt-3 hidden">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="text-xs font-medium">Content:</span>
+                                        <button id="closeViewerBtn" class="text-xs text-gray-500 hover:text-gray-700">
+                                            ✕
+                                        </button>
+                                    </div>
+                                    <div id="chunkContent" class="bg-gray-100 p-2 rounded text-xs font-mono overflow-auto max-h-40">
+                                        <!-- Raw chunk content will be displayed here -->
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Modal for viewing raw chunk content -->
+                            <div id="chunkModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                                <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                                    <div class="flex justify-between items-center border-b px-4 py-2">
+                                        <h3 class="font-medium" id="modalTitle">Chunk Content</h3>
+                                        <button id="closeModalBtn" class="text-gray-500 hover:text-gray-700">
+                                            ✕
+                                        </button>
+                                    </div>
+                                    <div class="p-4 overflow-auto flex-grow">
+                                        <pre id="modalContent" class="text-xs whitespace-pre-wrap break-all"></pre>
+                                    </div>
+                                    <div class="border-t px-4 py-2 flex justify-end">
+                                        <button id="downloadModalBtn" class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm">
+                                            Download
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        
+                        <!-- Network Throttling Controls -->
+                        <div class="mt-4 pt-4 border-t">
+                            <div class="font-medium mb-2">Network Throttling</div>
+                            <div class="space-y-2">
+                                <button onclick="setNetworkThrottle(0)" class="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-gray-100 border border-transparent hover:border-gray-300">
+                                    🚀 No Throttling
+                                </button>
+                                <button onclick="setNetworkThrottle(1)" class="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-gray-100 border border-transparent hover:border-gray-300">
+                                    📶 Fast 3G (~1.5 Mbps)
+                                </button>
+                                <button onclick="setNetworkThrottle(2)" class="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-gray-100 border border-transparent hover:border-gray-300">
+                                    🐢 Slow 3G (~400 Kbps)
+                                </button>
+                                <div class="flex items-center mt-2">
+                                    <span class="text-sm text-gray-600 mr-2">Custom (Kbps):</span>
+                                    <input type="number" id="customBitrate" class="w-20 px-2 py-1 border rounded text-sm" min="50" value="1000">
+                                    <button onclick="setCustomBitrate()" class="ml-2 px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200">
+                                        Set
+                                    </button>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1" id="currentThrottle">
+                                    Current: No throttling
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Handle media format changes
+        function updateProtocolOptions() {
+            const mediaFormat = document.querySelector('input[name="mediaFormat"]:checked').value;
+            const protocolHLS = document.getElementById('protocolHLS');
+            const protocolDASH = document.getElementById('protocolDASH');
+            const protocolRTSP = document.getElementById('protocolRTSP');
+            const labelHLS = document.querySelector('label[for="protocolHLS"]');
+            const labelDASH = document.querySelector('label[for="protocolDASH"]');
+            const labelRTSP = document.querySelector('label[for="protocolRTSP"]');
+            
+            // Reset all protocol options
+            [protocolHLS, protocolDASH, protocolRTSP].forEach(radio => {
+                radio.disabled = false;
+            });
+            [labelHLS, labelDASH, labelRTSP].forEach(label => {
+                label.classList.remove('opacity-50', 'cursor-not-allowed');
+            });
+            
+            // Enable/disable protocols based on selected media format
+            switch(mediaFormat) {
+                case 'm3u8': // HLS - Only HLS protocol allowed
+                    protocolHLS.checked = true;
+                    protocolDASH.disabled = true;
+                    protocolRTSP.disabled = true;
+                    labelDASH.classList.add('opacity-50', 'cursor-not-allowed');
+                    labelRTSP.classList.add('opacity-50', 'cursor-not-allowed');
+                    break;
+                case 'ts': // TS - Only RTSP protocol allowed
+                    protocolRTSP.checked = true;
+                    protocolHLS.disabled = true;
+                    protocolDASH.disabled = true;
+                    labelHLS.classList.add('opacity-50', 'cursor-not-allowed');
+                    labelDASH.classList.add('opacity-50', 'cursor-not-allowed');
+                    break;
+                case 'fmp4': // fMP4 - Only MPEG-DASH protocol allowed
+                    protocolDASH.checked = true;
+                    protocolHLS.disabled = true;
+                    protocolRTSP.disabled = true;
+                    labelHLS.classList.add('opacity-50', 'cursor-not-allowed');
+                    labelRTSP.classList.add('opacity-50', 'cursor-not-allowed');
+                    break;
+                case 'cmaf': // CMAF - Only MPEG-DASH protocol allowed
+                    protocolDASH.checked = true;
+                    protocolHLS.disabled = true;
+                    protocolRTSP.disabled = true;
+                    labelHLS.classList.add('opacity-50', 'cursor-not-allowed');
+                    labelRTSP.classList.add('opacity-50', 'cursor-not-allowed');
+                    break;
+            }
+        }
+        
+        // Initialize form controls
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up event listeners for media format changes
+            const mediaFormatRadios = document.querySelectorAll('input[name="mediaFormat"]');
+            mediaFormatRadios.forEach(radio => {
+                radio.addEventListener('change', updateProtocolOptions);
+            });
+            
+            // Initial update
+            updateProtocolOptions();
+        });
+        
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            console.log('Upload & Convert button clicked');
+    
+            const fileInput = document.getElementById('videoFile');
+            const mediaFormat = document.querySelector('input[name="mediaFormat"]:checked').value;
+            const streamingProtocol = document.querySelector('input[name="streamingProtocol"]:checked').value;
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('media_format', mediaFormat);
+            formData.append('streaming_protocol', streamingProtocol);
+            
+            const statusDiv = document.getElementById('status');
+            const statusMessage = document.getElementById('statusMessage');
+            statusDiv.classList.remove('hidden');
+            statusDiv.className = 'bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-8';
+            statusMessage.textContent = 'Uploading and processing your video...';
+            
+            // Show player area immediately under the form
+            const playerContainer = document.getElementById('playerContainer');
+            const playerInfo = document.getElementById('playerInfo');
+            if (playerContainer) {
+                playerContainer.classList.remove('hidden');
+                playerContainer.style.display = 'block';
+            }
+            if (playerInfo) {
+                playerInfo.textContent = 'Preparing your stream... (it may take some time to start)';
+            }
+            
+            try {
+                // Upload the file
+                console.log('Uploading file...', fileInput.files[0].name); // Log file info
+               
+                // Upload the file
+                const response = await fetch('/api/v1/upload', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Upload failed');
+                }
+                
+                const data = await response.json();
+                const taskId = data.task_id;
+                
+                // Poll for conversion status
+                const checkStatus = async () => {
+                    const statusResponse = await fetch(`/api/v1/tasks/${taskId}`);
+                    const statusData = await statusResponse.json();
+                    
+                    if (statusData.status === 'completed') {
+                        statusDiv.className = 'bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-8';
+                        statusMessage.textContent = 'Video processed successfully!';
+                        
+                        // First, get the stream information
+                        try {
+                            const streamResponse = await fetch(`/api/v1/stream/${taskId}`);
+                            const streamData = await streamResponse.json();
+                            
+                            if (streamResponse.ok && streamData.hls_url) {
+                                // Initialize player with the HLS stream
+                                const streamInfo = {
+                                    type: 'hls',
+                                    url: streamData.hls_url
+                                };
+                                console.log('Initializing player with:', streamInfo);
+                                initializePlayer(streamInfo);
+                                return;
+                            } else {
+                                throw new Error('No valid stream URL found');
+                            }
+                        } catch (error) {
+                            console.error('Error initializing player:', error);
+                            throw new Error('Failed to initialize player: ' + error.message);
+                        }
+                    } else if (statusData.status === 'failed') {
+                        throw new Error(statusData.error || 'Conversion failed');
+                    }
+                    
+                    // Check again in 2 seconds
+                    setTimeout(checkStatus, 2000);
+                };
+                
+                await checkStatus();
+                
+            } catch (error) {
+                console.error('Upload error:', error);
+                statusDiv.className = 'bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-8';
+                statusMessage.textContent = `Error: ${error.message}`;
+                console.error('Error:', error);
+            }
+        });
+        
+        // Track chunk history and resolution state
+        const chunkHistory = [];
+        const maxHistoryItems = 5;
+        let availableResolutions = [];
+        let currentResolution = null;
+        
+        // Network throttling variables
+        let currentThrottle = 0; // 0 = no throttle, 1 = fast 3G, 2 = slow 3G, 3 = custom
+        let customBitrate = 1000; // Default custom bitrate in Kbps
+        let originalFetch = window.fetch;
+        let currentPlayer = null;
+        
+        // Network profiles (in Kbps)
+        const networkProfiles = [
+            { name: 'No throttling', download: 0, upload: 0, latency: 0 },
+            { name: 'Fast 3G', download: 1500, upload: 750, latency: 40 },
+            { name: 'Slow 3G', download: 400, upload: 200, latency: 200 },
+        ];
+        
+        // Override fetch to add throttling
+        window.fetch = async function(resource, options) {
+            if (currentThrottle > 0) {
+                const profile = currentThrottle === 3 ? 
+                    { name: 'Custom', download: customBitrate, upload: customBitrate / 2, latency: 100 } : 
+                    networkProfiles[currentThrottle];
+                
+                // Only throttle video/audio segments and manifests
+                if (resource && (resource.endsWith('.m3u8') || resource.endsWith('.ts') || 
+                                resource.endsWith('.mpd') || resource.endsWith('.m4s'))) {
+                    const delay = (profile.latency || 0) + 
+                                (profile.download ? (Math.random() * 1000 * 8 * 1000 / profile.download) : 0);
+                    
+                    await new Promise(resolve => setTimeout(resolve, Math.floor(delay)));
+                    
+                    // Throttle the download speed
+                    if (profile.download > 0) {
+                        const originalResponse = await originalFetch(resource, options);
+                        const originalBody = await originalResponse.blob();
+                        
+                        // Calculate time to take based on file size and bitrate
+                        const fileSize = originalBody.size * 8; // in bits
+                        const timeToTake = (fileSize / (profile.download * 1000)) * 1000; // in ms
+                        
+                        // Create a new response with the same data but with throttled speed
+                        return new Response(
+                            new ReadableStream({
+                                async start(controller) {
+                                    const reader = originalBody.stream().getReader();
+                                    const chunkSize = 1024 * 10; // 10KB chunks
+                                    let offset = 0;
+                                    
+                                    while (true) {
+                                        const { done, value } = await reader.read();
+                                        if (done) {
+                                            controller.close();
+                                            break;
+                                        }
+                                        
+                                        controller.enqueue(value);
+                                        offset += value.length;
+                                        
+                                        // Calculate delay for this chunk
+                                        const chunkTime = (chunkSize * 8 * 1000) / (profile.download * 1000);
+                                        await new Promise(r => setTimeout(r, chunkTime));
+                                    }
+                                }
+                            }),
+                            {
+                                status: originalResponse.status,
+                                statusText: originalResponse.statusText,
+                                headers: originalResponse.headers
+                            }
+                        );
+                    }
+                }
+            }
+            
+            return originalFetch(resource, options);
+        };
+        
+        // Network throttling functions
+        function setNetworkThrottle(profile) {
+            currentThrottle = profile;
+            updateThrottleUI();
+            
+            // If we have a player, force it to reload to apply throttling
+            if (currentPlayer && currentPlayer.hls) {
+                currentPlayer.hls.startLoad();
+            } else if (currentPlayer && currentPlayer.dash) {
+                currentPlayer.dash.reset();
+            }
+        }
+        
+        function setCustomBitrate() {
+            const bitrate = parseInt(document.getElementById('customBitrate').value);
+            if (!isNaN(bitrate) && bitrate >= 50) {
+                customBitrate = bitrate;
+                currentThrottle = 3; // Set to custom profile
+                updateThrottleUI();
+                
+                // Force player to reload with new throttling
+                if (currentPlayer && currentPlayer.hls) {
+                    currentPlayer.hls.startLoad();
+                } else if (currentPlayer && currentPlayer.dash) {
+                    currentPlayer.dash.reset();
+                }
+            }
+        }
+        
+        function updateThrottleUI() {
+            let profile;
+            if (currentThrottle === 0) {
+                profile = networkProfiles[0];
+            } else if (currentThrottle === 3) {
+                profile = { name: 'Custom', download: customBitrate };
+            } else {
+                profile = networkProfiles[currentThrottle];
+            }
+            
+            const throttleText = currentThrottle === 0 ? 
+                'No throttling' : 
+                `${profile.name} (${profile.download} Kbps${profile.latency ? `, ${profile.latency}ms` : ''})`;
+                
+            document.getElementById('currentThrottle').textContent = `Current: ${throttleText}`;
+        }
+        
+        // Update the resolution controls UI
+        function updateResolutionControls() {
+            const container = document.getElementById('resolutionControls');
+            if (!container) return;
+            
+            const buttons = container.querySelectorAll('button');
+            buttons.forEach((btn, index) => {
+                if (index === currentResolution) {
+                    btn.classList.add('bg-blue-500', 'text-white');
+                    btn.classList.remove('bg-gray-100', 'hover:bg-gray-200');
+                } else {
+                    btn.classList.remove('bg-blue-500', 'text-white');
+                    btn.classList.add('bg-gray-100', 'hover:bg-gray-200');
+                }
+            });
+        }
+        
+        // Set the video resolution
+        function setResolution(levelId) {
+            const videoElement = document.getElementById('videoElement');
+            if (!videoElement) return;
+            
+            if (currentPlayer) {
+                if (currentPlayer.hls) {
+                    // For HLS, we'll map the levelId to actual quality levels
+                    // levelId 0 = auto, 1 = 270p, 2 = 360p, 3 = 480p, 4 = 1080p
+                    const levels = currentPlayer.hls.levels || [];
+                    let targetLevel = -1; // Auto by default
+                    
+                    if (levelId > 0) {
+                        const targetHeights = [270, 360, 480, 1080];
+                        const targetHeight = targetHeights[levelId - 1];
+                        
+                        // Find the level that matches our target height
+                        for (let i = 0; i < levels.length; i++) {
+                            if (levels[i].height <= targetHeight) {
+                                targetLevel = i;
+                                break;
+                            }
+                        }
+                        
+                        // If no exact match, use the highest quality below target
+                        if (targetLevel === -1 && levels.length > 0) {
+                            for (let i = levels.length - 1; i >= 0; i--) {
+                                if (levels[i].height <= targetHeight) {
+                                    targetLevel = i;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    currentPlayer.hls.currentLevel = targetLevel;
+                    currentResolution = levelId;
+                    updateResolutionControls();
+                } else if (currentPlayer.dash) {
+                    try {
+                        const tracks = currentPlayer.dash.getBitrateInfoListFor('video');
+                        console.log('Available DASH quality levels:', tracks);
+                        
+                        // For DASH, we'll map the levelId to actual quality levels
+                        // levelId 0 = auto, 1 = 270p, 2 = 360p, 3 = 480p, 4 = 1080p
+                        let targetQuality = -1; // Auto by default
+                        
+                        if (levelId > 0) {
+                            const targetHeights = [270, 360, 480, 1080];
+                            const targetHeight = targetHeights[levelId - 1];
+                            
+                            // Find the best matching quality
+                            let closestDiff = Infinity;
+                            
+                            tracks.forEach((track, index) => {
+                                const diff = Math.abs((track.height || 0) - targetHeight);
+                                if (diff < closestDiff) {
+                                    closestDiff = diff;
+                                    targetQuality = index;
+                                }
+                            });
+                            
+                            console.log(`Setting DASH quality to level ${targetQuality} (target: ${targetHeight}p, actual: ${tracks[targetQuality]?.height || 'auto'}p)`);
+                        }
+                        
+                        currentPlayer.dash.setQualityFor('video', targetQuality, true);
+                        currentResolution = levelId;
+                        updateResolutionControls();
+                        
+                        // Update the displayed resolution
+                        const resolutionText = videoElement.videoWidth ? 
+                            `${videoElement.videoWidth}x${videoElement.videoHeight}` : 'Auto';
+                        document.getElementById('currentResolution').textContent = resolutionText;
+                        
+                    } catch (e) {
+                        console.error('Error setting DASH resolution:', e);
+                        showError('Failed to change resolution: ' + (e.message || 'Unknown error'));
+                    }
+                }
+            }
+        }
+        
+        function clearChunkHistory() {
+            chunkHistory.length = 0;
+            const historyElement = document.getElementById('chunkHistory');
+            historyElement.innerHTML = '<p class="text-gray-500 text-center py-2">No recent chunks</p>';
+            document.getElementById('chunkDetails').classList.add('hidden');
+        }
+
+        let currentChunkUrl = '';
+        let currentChunkType = '';
+        let currentChunkName = '';
+
+        function showChunkDetails(index) {
+            const chunk = chunkHistory[index];
+            if (!chunk) return;
+
+            // Store the current chunk info for download/view actions
+            currentChunkUrl = chunk.info.url || '';
+            currentChunkType = chunk.info.type || '';
+            currentChunkName = chunk.info.chunk || 'chunk';
+
+            const details = [
+                { label: 'Time', value: chunk.time },
+                { label: 'Chunk', value: chunk.info.chunk },
+                { label: 'Bitrate', value: chunk.info.bitrate || 'N/A' },
+                { label: 'Resolution', value: chunk.info.resolution || 'N/A' },
+                { label: 'Type', value: chunk.info.type || 'N/A' },
+                { label: 'Duration', value: chunk.info.duration ? `${chunk.info.duration.toFixed(2)}s` : 'N/A' },
+                { 
+                    label: 'URL', 
+                    value: chunk.info.url ? 
+                        `<a href="${chunk.info.url}" target="_blank" class="text-blue-500 hover:underline break-all">${chunk.info.url}</a>` : 
+                        'N/A' 
+                }
+            ];
+
+            const detailContent = details.map(item => 
+                `<div class="grid grid-cols-3 gap-2">
+                    <span class="font-medium text-gray-700">${item.label}:</span>
+                    <span class="col-span-2 break-all">${item.value}</span>
+                </div>`
+            ).join('');
+
+            const chunkDetails = document.getElementById('chunkDetails');
+            const chunkDetailContent = document.getElementById('chunkDetailContent');
+            
+            chunkDetailContent.innerHTML = detailContent;
+            chunkDetails.classList.remove('hidden');
+            
+            // Enable/disable action buttons
+            const viewBtn = document.getElementById('viewRawBtn');
+            const downloadBtn = document.getElementById('downloadChunkBtn');
+            
+            if (chunk.info.chunk && chunk.info.type) {
+                viewBtn.disabled = false;
+                downloadBtn.disabled = false;
+                
+                // Set up click handlers
+                viewBtn.onclick = () => viewChunkContent(chunk);
+                downloadBtn.onclick = () => downloadChunk(chunk);
+            } else {
+                viewBtn.disabled = true;
+                downloadBtn.disabled = true;
+            }
+            
+            // Hide the content viewer when selecting a new chunk
+            document.getElementById('chunkContentViewer').classList.add('hidden');
+            
+            // Highlight the selected chunk
+            const historyItems = document.querySelectorAll('#chunkHistory > div');
+            historyItems.forEach((item, i) => {
+                item.classList.toggle('bg-blue-50', i === index);
+                item.classList.toggle('border-blue-400', i === index);
+            });
+        }
+        
+        async function viewChunkContent(chunk) {
+            if (!chunk.info.chunk || !chunk.info.type) return;
+            
+            const contentViewer = document.getElementById('chunkContentViewer');
+            const chunkContent = document.getElementById('chunkContent');
+            
+            // Show loading state
+            chunkContent.textContent = 'Loading content...';
+            contentViewer.classList.remove('hidden');
+            
+            try {
+                // For binary content, we'll show a message instead of raw bytes
+                if (chunk.info.chunk.endsWith('.ts') || 
+                    chunk.info.chunk.endsWith('.m4s') ||
+                    chunk.info.chunk.endsWith('.mp4')) {
+                    chunkContent.textContent = 'Binary content. Use the download button to save the file.';
+                    return;
+                }
+                
+                // For text-based content (like m3u8, mpd), fetch and display the content
+                const response = await fetch(chunk.info.url);
+                if (!response.ok) throw new Error('Failed to fetch chunk content');
+                
+                const textContent = await response.text();
+                chunkContent.textContent = textContent;
+                
+            } catch (error) {
+                console.error('Error loading chunk content:', error);
+                chunkContent.textContent = 'Error loading content: ' + (error.message || 'Unknown error');
+            }
+        }
+        
+        function downloadChunk(chunk) {
+            if (!chunk.info.chunk || !chunk.info.url) return;
+            
+            const link = document.createElement('a');
+            link.href = chunk.info.url;
+            link.download = chunk.info.chunk;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // Initialize modal functionality
+        document.addEventListener('DOMContentLoaded', () => {
+            // Close modal button
+            document.getElementById('closeViewerBtn')?.addEventListener('click', () => {
+                document.getElementById('chunkContentViewer').classList.add('hidden');
+            });
+            
+            // Modal close button
+            document.getElementById('closeModalBtn')?.addEventListener('click', () => {
+                document.getElementById('chunkModal').classList.add('hidden');
+            });
+            
+            // Close modal when clicking outside
+            document.getElementById('chunkModal')?.addEventListener('click', (e) => {
+                if (e.target === document.getElementById('chunkModal')) {
+                    document.getElementById('chunkModal').classList.add('hidden');
+                }
+            });
+            
+            // Download button in modal
+            document.getElementById('downloadModalBtn')?.addEventListener('click', () => {
+                downloadChunk({
+                    info: {
+                        chunk: currentChunkName,
+                        url: currentChunkUrl
+                    }
+                });
+            });
+        });
+
+        function updateChunkInfo(chunkInfo) {
+            // Update current chunk info
+            document.getElementById('currentChunk').textContent = chunkInfo.chunk || '-';
+            document.getElementById('currentBitrate').textContent = chunkInfo.bitrate || '-';
+            document.getElementById('currentResolution').textContent = chunkInfo.resolution || '-';
+            
+            // Store the full URL if available
+            if (chunkInfo.url) {
+                chunkInfo.url = new URL(chunkInfo.url, window.location.origin).href;
+            }
+            
+            // Add to history
+            if (chunkInfo.chunk) {
+                chunkHistory.unshift({
+                    time: new Date().toLocaleTimeString(),
+                    info: chunkInfo
+                });
+                
+                // Keep only the last N items
+                if (chunkHistory.length > maxHistoryItems) {
+                    chunkHistory.pop();
+                }
+                
+                // Update history display
+                const historyElement = document.getElementById('chunkHistory');
+                historyElement.innerHTML = chunkHistory.map((item, index) => 
+                    `<div onclick="showChunkDetails(${index})" 
+                         class="p-2 mb-1 rounded cursor-pointer hover:bg-blue-50 border border-transparent hover:border-blue-200 transition-colors">
+                        <div class="font-medium">${item.info.chunk}</div>
+                        <div class="text-gray-500 text-xs">
+                            <span>${item.time}</span> • 
+                            <span>${item.info.bitrate || 'N/A'}</span> • 
+                            <span>${item.info.resolution || 'N/A'}</span>
+                        </div>
+                    </div>`
+                ).join('');
+            }
+        }
+        
+        function initializePlayer(streamInfo) {
+            console.log('Initializing player with stream info:', JSON.stringify(streamInfo, null, 2));
+            
+            const videoElement = document.getElementById('videoElement');
+            const playerContainer = document.getElementById('playerContainer');
+            const playerInfo = document.getElementById('playerInfo');
+            
+            if (!videoElement) {
+                console.error('Video element not found');
+                return;
+            }
+            
+            // Store reference to the current player
+            currentPlayer = { hls: null, dash: null };
+            
+            try {
+                // Clear any existing source and reset player
+                videoElement.pause();
+                videoElement.removeAttribute('src');
+                videoElement.load();
+                
+                // Clear any previous error messages
+                const existingErrors = playerContainer.querySelectorAll('.error-message');
+                existingErrors.forEach(el => el.remove());
+                
+                if (!streamInfo || !streamInfo.url) {
+                    throw new Error('No stream URL provided');
+                }
+                
+                console.log('Stream URL:', streamInfo.url);
+                // 항상 player 영역을 보이도록 처리 (페이지 reload 없이)
+                if (playerContainer) {
+                    playerContainer.classList.remove('hidden');
+                    playerContainer.style.display = 'block';
+                }
+                if (playerInfo) {
+                    playerInfo.textContent = `Streaming via ${streamInfo.type.toUpperCase()} - ${streamInfo.url}`;
+                }
+                
+                const protocol = streamInfo.type;
+                let player = null;
+                
+                // Reset chunk info
+                updateChunkInfo({});
+                
+                // Check if HLS is supported
+                if (protocol === 'hls' && !Hls.isSupported()) {
+                    throw new Error('HLS is not supported in this browser');
+                }
+                
+                if (protocol === 'hls') {
+                    if (Hls.isSupported()) {
+                        currentPlayer.hls = new Hls({
+                            debug: true,
+                            enableWorker: true,
+                            lowLatencyMode: false,
+                            backBufferLength: 30,
+                            maxBufferLength: 30,
+                            maxMaxBufferLength: 60,
+                            startLevel: -1, // Auto-select starting quality
+                            maxBufferHole: 0.5,
+                            maxFragLookUpTolerance: 0.25,
+                            manifestLoadingTimeOut: 10000,
+                            manifestLoadingMaxRetry: 3,
+                            manifestLoadingRetryDelay: 1000,
+                            fragLoadingTimeOut: 20000,
+                            fragLoadingMaxRetry: 6,
+                            fragLoadingRetryDelay: 1000
+                        });
+                        
+                        // Ensure URL is properly formatted
+                        let streamUrl = streamInfo.url;
+                        console.log('Original stream URL:', streamUrl);
+                        
+                        // If it's a relative URL, make sure it's absolute
+                        if (!streamUrl.startsWith('http') && !streamUrl.startsWith('blob:')) {
+                            // Remove any leading slashes to avoid double slashes
+                            streamUrl = streamUrl.replace(/^\/+/, '');
+                            
+                            // Prepend the base URL if needed
+                            if (!streamUrl.startsWith('static/') && !streamUrl.startsWith('http')) {
+                                streamUrl = 'static/' + streamUrl;
+                            }
+                            
+                            // Ensure there's a single leading slash
+                            streamUrl = '/' + streamUrl.replace(/^\/+/, '');
+                            
+                            console.log('Processed stream URL:', streamUrl);
+                        }
+                        
+                        console.log('Loading HLS stream from:', streamUrl);
+                        
+                        // Use the existing HLS instance
+                        const hls = currentPlayer.hls;
+                        
+                        // Handle errors
+                        hls.on(Hls.Events.ERROR, (event, data) => {
+                            console.error('HLS Error:', data);
+                            if (data.fatal) {
+                                switch(data.type) {
+                                    case Hls.ErrorTypes.NETWORK_ERROR:
+                                        console.error('Fatal network error encountered, trying to recover...');
+                                        hls.startLoad();
+                                        break;
+                                    case Hls.ErrorTypes.MEDIA_ERROR:
+                                        console.error('Fatal media error encountered, trying to recover...');
+                                        hls.recoverMediaError();
+                                        break;
+                                    default:
+                                        console.error('Unrecoverable error');
+                                        break;
+                                }
+                            }
+                        });
+                        
+                        // Load the source
+                        hls.loadSource(streamUrl);
+                        hls.attachMedia(videoElement);
+                        
+                        hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+                            console.log('HLS manifest loaded, found ' + data.levels.length + ' quality levels', data);
+                            
+                            try {
+                                // Update available resolutions
+                                availableResolutions = data.levels.map((level, index) => ({
+                                    id: index,
+                                    width: level.width,
+                                    height: level.height,
+                                    bitrate: level.bitrate
+                                }));
+                                
+                                // Set initial resolution to auto
+                                currentResolution = -1; // -1 means auto
+                                updateResolutionControls();
+                                
+                                // Try to start playback
+                                const playPromise = videoElement.play();
+                                
+                                if (playPromise !== undefined) {
+                                    playPromise.then(() => {
+                                        console.log('Playback started successfully');
+                                    }).catch(e => {
+                                        console.error('Playback failed:', e);
+                                        showError('Playback failed: ' + e.message);
+                                    });
+                                }
+                            } catch (e) {
+                                console.error('Error in MANIFEST_PARSED handler:', e);
+                                showError('Error initializing player: ' + e.message);
+                            }
+                        });
+                        
+                        hls.on(Hls.Events.ERROR, (event, data) => {
+                            console.error('HLS Error:', data);
+                            if (data.fatal) {
+                                switch(data.type) {
+                                    case Hls.ErrorTypes.NETWORK_ERROR:
+                                        showError('Network error. Trying to recover...');
+                                        hls.startLoad();
+                                        break;
+                                    case Hls.ErrorTypes.MEDIA_ERROR:
+                                        showError('Media error. Attempting to recover...');
+                                        hls.recoverMediaError();
+                                        break;
+                                    default:
+                                        showError('Fatal error. Cannot recover.');
+                                        hls.destroy();
+                                        break;
+                                }
+                            }
+                        });
+                        
+                        hls.on(Hls.Events.MANIFEST_LOADED, () => {
+                            console.log('HLS manifest loaded');
+                        });
+                        
+                        hls.on(Hls.Events.FRAG_LOADED, (event, data) => {
+                            console.log('Fragment loaded:', data.frag.url);
+                            try {
+                                updateChunkInfo({
+                                    url: data.frag.url,
+                                    type: 'hls',
+                                    level: data.frag.level,
+                                    sn: data.frag.sn,
+                                    duration: data.frag.duration
+                                });
+                            } catch (e) {
+                                console.error('Error updating chunk info:', e);
+                            }
+                    hls.on(Hls.Events.MANIFEST_LOADED, () => {
+                        console.log('HLS manifest loaded');
+                    });
+                    
+                    hls.on(Hls.Events.FRAG_LOADED, (event, data) => {
+                        console.log('Fragment loaded:', data.frag.url);
+                    });
+                    
+                    hls.on(Hls.Events.ERROR, (event, data) => {
+                        console.error('HLS Error:', data);
+                        if (data.fatal) {
+                            switch(data.type) {
+                                case Hls.ErrorTypes.NETWORK_ERROR:
+                                    showError('Network error occurred. Please try again.');
+                                    break;
+                                case Hls.ErrorTypes.MEDIA_ERROR:
+                                    showError('Media error. The video might be corrupted.');
+                                    break;
+                                default:
+                                    showError('An error occurred while loading the video.');
+                                    break;
+                            }
+                        }
+                    });
+                    
+                    hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
+                        const level = hls.levels[hls.currentLevel];
+                        updateChunkInfo({
+                            chunk: data.frag.url.split('/').pop(),
+                            bitrate: level ? Math.round(level.bitrate / 1000) + ' kbps' : 'N/A',
+                            resolution: level ? level.width + 'x' + level.height : 'N/A'
+                        });
+                    });
+                    
+                    hls.on(Hls.Events.ERROR, (event, data) => {
+                        if (data.fatal) {
+                            console.error('HLS Error:', data);
+                        }
+                    });
+                    
+                } else if (videoElement.canPlayType('application/vnd.apple.mpegurl') || 
+                          videoElement.canPlayType('application/x-mpegURL') ||
+                          videoElement.canPlayType('audio/mpegurl')) {
+                    // For Safari
+                    videoElement.src = streamUrl;
+                    videoElement.addEventListener('loadedmetadata', () => {
+                        videoElement.play().catch(e => console.error('Playback failed:', e));
+                    });
+                    
+                    // For Safari, we can't track chunks as precisely
+                    videoElement.addEventListener('progress', () => {
+                        const currentTime = Math.floor(videoElement.currentTime);
+                        updateChunkInfo({
+                            chunk: `chunk_${currentTime}.ts`,
+                            bitrate: 'N/A',
+                            resolution: videoElement.videoWidth ? 
+                                `${videoElement.videoWidth}x${videoElement.videoHeight}` : 'N/A'
+                        });
+                    });
+                }
+            } else if (protocol === 'dash') {
+                try {
+                    if (typeof dashjs === 'undefined') {
+                        throw new Error('Dash.js library not loaded');
+                    }
+                    
+                    console.log('Initializing DASH player with URL:', streamInfo.url);
+                    
+                    // Create a new DASH player instance
+                    player = dashjs.MediaPlayer().create();
+                    
+                    // Enable debug logging
+                    player.updateSettings({
+                        'debug': {
+                            'logLevel': dashjs.Debug.LOG_LEVEL_DEBUG,
+                            'logger': {
+                                'debug': console.debug.bind(console),
+                                'info': console.info.bind(console),
+                                'warn': console.warn.bind(console),
+                                'error': console.error.bind(console),
+                                'fatal': console.error.bind(console)
+                            }
+                        },
+                        'streaming': {
+                            'jumpGaps': true,
+                            'smallGapLimit': 1.5,
+                            'stableBufferTime': 10,
+                            'buffer': {
+                                'fastSwitchEnabled': true,
+                                'reuseExistingSourceBuffers': true,
+                                'bufferTimeAtTopQuality': 30,
+                                'bufferTimeAtTopQualityLongForm': 60
+                            }
+                        }
+                    });
+                    
+                    // Handle DASH player errors
+                    player.on(dashjs.MediaPlayer.events.ERROR, function(e) {
+                        console.error('DASH Player Error Event:', e);
+                        let errorMessage = 'Error playing DASH stream';
+                        
+                        if (e.error) {
+                            console.error('DASH Error Details:', e.error);
+                            
+                            if (e.error.code) {
+                                errorMessage += ` (Code: ${e.error.code})`;
+                                
+                                // Map common DASH error codes to user-friendly messages
+                                const errorCodes = dashjs.MediaPlayer.errors || {};
+                                switch(e.error.code) {
+                                    case errorCodes.MANIFEST_LOADER_LOADING_TIMEOUT_ERROR:
+                                        errorMessage = 'Failed to load the DASH manifest (timeout)';
+                                        break;
+                                    case errorCodes.MANIFEST_LOADER_PARSING_FAILURE_ERROR:
+                                        errorMessage = 'Failed to parse the DASH manifest';
+                                        break;
+                                    case errorCodes.MANIFEST_LOADER_LOADING_FAILURE_ERROR:
+                                        errorMessage = 'Failed to load the DASH manifest';
+                                        break;
+                                    case errorCodes.MANIFEST_EMPTY_ERROR:
+                                        errorMessage = 'The DASH manifest is empty';
+                                        break;
+                                    case errorCodes.MANIFEST_PARSE_ERROR:
+                                        errorMessage = 'Failed to parse the DASH manifest';
+                                        break;
+                                }
+                            }
+                            
+                            if (e.error.message) {
+                                errorMessage += `: ${e.error.message}`;
+                            }
+                        }
+                        
+                        showError(errorMessage);
+                    });
+                    
+                    // Log when the stream is loaded
+                    player.on(dashjs.MediaPlayer.events.MANIFEST_LOADED, function(e) {
+                        console.log('DASH manifest loaded:', e);
+                    });
+                    
+                    player.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, function() {
+                        console.log('DASH stream initialized successfully');
+                        console.log('Available bitrates:', player.getBitrateInfoListFor('video'));
+                    });
+                    
+                    // Initialize the player
+                    player.initialize(videoElement, streamInfo.url, true);
+                    currentPlayer = { dash: player };
+                    
+                } catch (e) {
+                    console.error('Failed to initialize DASH player:', e);
+                    showError('Failed to initialize DASH player: ' + (e.message || 'Unknown error'));
+                    return;
+                }
+                
+                player.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, function() {
+                    console.log('DASH stream initialized');
+                    
+                    // Get available quality levels
+                    const tracks = player.getBitrateInfoListFor('video');
+                    availableResolutions = tracks.map((track, index) => ({
+                        id: index,
+                        width: track.width,
+                        height: track.height,
+                        bitrate: track.bitrate
+                    }));
+                    
+                    // Set initial resolution to auto
+                    currentResolution = -1;
+                    updateResolutionControls();
+                    
+                    videoElement.play().catch(e => {
+                        console.error('DASH playback failed:', e);
+                        showError('Playback failed: ' + e.message);
+                    });
+                });
+            } else if (protocol === 'rtsp') {
+                // For RTSP, we'll use a simple video element with RTSP URL
+                // Note: Most browsers don't support RTSP natively, this is just for demonstration
+                // In a production environment, you'd need a WebRTC gateway or similar
+                videoElement.src = streamInfo.url;
+                videoElement.controls = true;
+                videoElement.autoplay = true;
+                
+                // Show a warning that RTSP might not work in all browsers
+                const warning = document.createElement('div');
+                warning.className = 'bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mt-4';
+                warning.innerHTML = `
+                    <p class="font-bold">RTSP Streaming Note:</p>
+                    <p>RTSP streaming requires a compatible player or browser extension. For best results, use VLC media player or a dedicated RTSP client.</p>
+                    <p class="mt-2">RTSP URL: <code class="bg-gray-100 p-1 rounded">${streamInfo.url}</code></p>
+                `;
+                playerContainer.appendChild(warning);
+                
+                player.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, function() {
+                    videoElement.play().catch(e => console.error('Playback failed:', e));
+                });
+                
+                player.on(dashjs.MediaPlayer.events.QUALITY_CHANGE_RENDERED, function(e) {
+                    if (e.mediaType === 'video') {
+                        const currentTime = Math.floor(videoElement.currentTime);
+                        updateChunkInfo({
+                            chunk: `chunk_${currentTime}.mp4`,
+                            bitrate: Math.round(e.bitrate / 1000) + ' kbps',
+                            resolution: e.width ? `${e.width}x${e.height}` : 'N/A'
+                        });
+                    }
+                });
+                
+                // Update on fragment loading
+                player.on(dashjs.MediaPlayer.events.FRAGMENT_LOADING_COMPLETED, function(e) {
+                    if (e.request.type === 'MediaSegment') {
+                        const currentTime = Math.floor(videoElement.currentTime);
+                        updateChunkInfo({
+                            chunk: e.request.media + '_' + currentTime,
+                            bitrate: Math.round(player.getBitrateInfoListFor('video')[player.getQualityFor('video')].bitrate / 1000) + ' kbps',
+                            resolution: videoElement.videoWidth ? 
+                                `${videoElement.videoWidth}x${videoElement.videoHeight}` : 'N/A'
+                        });
+                    }
+                });
+            }
+            
+            // Add error handling
+            function showError(message) {
+                console.error('Player Error:', message);
+                
+                // Remove any existing error messages
+                const existingErrors = playerContainer.querySelectorAll('.error-message');
+                existingErrors.forEach(el => el.remove());
+                
+                // Show error message in the UI
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mt-4';
+                errorDiv.textContent = message;
+                playerContainer.appendChild(errorDiv);
+                
+                updateChunkInfo({
+                    error: message
+                });
+            }
+            
+            videoElement.addEventListener('error', function() {
+                const error = videoElement.error;
+                let errorMessage = 'An error occurred while playing the video.';
+                
+                if (error) {
+                    switch(error.code) {
+                        case MediaError.MEDIA_ERR_ABORTED:
+                            errorMessage = 'Video playback was aborted.';
+                            break;
+                        case MediaError.MEDIA_ERR_NETWORK:
+                            errorMessage = 'A network error occurred. Please check your connection.';
+                            break;
+                        case MediaError.MEDIA_ERR_DECODE:
+                            errorMessage = 'Error decoding the video. The format might not be supported.';
+                            break;
+                        case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                            errorMessage = 'The video format is not supported by your browser.';
+                            break;
+                        default:
+                            errorMessage = error.message || errorMessage;
+                    }
+                }
+                
+                showError(errorMessage);
+            });
+            
+            // Show play button overlay when video is paused
+            videoElement.addEventListener('play', function() {
+                playerOverlay.classList.add('hidden');
+            });
+            
+            videoElement.addEventListener('pause', function() {
+                playerOverlay.classList.remove('hidden');
+            });
+            
+            // Auto-hide controls when playing
+            let hideControlsTimeout;
+            videoElement.addEventListener('playing', function() {
+                clearTimeout(hideControlsTimeout);
+                videoElement.controls = true;
+                hideControlsTimeout = setTimeout(() => {
+                    if (!videoElement.paused) {
+                        videoElement.controls = false;
+                    }
+                }, 3000);
+            });
+            
+            // Show controls when hovering or touching
+            playerContainer.addEventListener('mousemove', function() {
+                videoElement.controls = true;
+                clearTimeout(hideControlsTimeout);
+                hideControlsTimeout = setTimeout(() => {
+                    if (!videoElement.paused) {
+                        videoElement.controls = false;
+                    }
+                }, 3000);
+            });
+            
+            playerContainer.addEventListener('touchstart', function() {
+                videoElement.controls = true;
+                clearTimeout(hideControlsTimeout);
+            });
+            
+            // For RTSP, add additional error handling
+            if (protocol === 'rtsp') {
+                videoElement.addEventListener('loadedmetadata', function() {
+                    console.log('RTSP stream metadata loaded');
+                    videoElement.play().catch(e => {
+                        console.error('RTSP playback failed:', e);
+                        const errorDiv = document.createElement('div');
+                        errorDiv.className = 'bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mt-4';
+                        errorDiv.textContent = `RTSP Playback failed: ${e.message}. Try using a dedicated RTSP player with the URL above.`;
+                        playerContainer.appendChild(errorDiv);
+                    });
+                });
+            }
+            
+            // Scroll to player
+            playerContainer.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
