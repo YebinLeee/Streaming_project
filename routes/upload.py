@@ -14,7 +14,9 @@ async def upload_video(
     file: UploadFile = File(...),
     media_format: str = Form(...),
     streaming_protocol: str = Form(...),
-    segment_duration: int = Form(6)
+    segment_duration: int = Form(6),
+    crf: int = Form(20),
+    resolution: str = Form("source")
 ):
     task_id = None
     try:
@@ -93,6 +95,8 @@ async def upload_video(
             'media_format': media_format,
             'streaming_protocol': streaming_protocol,
             'segment_duration': int(segment_duration),
+            'crf': int(crf),
+            'resolution': resolution,
             'status': 'pending',
             'progress': 0,
             'error': None

@@ -3,7 +3,7 @@
 A powerful web application for uploading videos and streaming them using HLS, DASH, or RTSP protocols with adaptive bitrate streaming and resolution control.
 
 ## Features
-![Streaming UI](docs/view_image.png)
+![Streaming UI](docs/image.png)
 - 🎥 Upload MP4 videos
 - 🔄 Multiple media format support for packaging:
   - HLS (m3u8/ts)
@@ -14,10 +14,16 @@ A powerful web application for uploading videos and streaming them using HLS, DA
   - HLS (HTTP Live Streaming)
   - MPEG-DASH
   - RTSP (Real Time Streaming Protocol)
-- 🎚️ Adaptive bitrate streaming
-- 🖥️ Resolution control (client-side)
-- 🌈 Network condition simulation
+- 🎚️ Encoding controls per upload:
+  - Segment duration (seconds) for HLS/DASH/CMAF
+  - CRF (H.264 quality, lower = higher quality)
+  - Output resolution toggle (Source / 360p / 720p / 1080p)
+- 🧭 Segment navigation UI:
+  - Shows currently loaded HLS/DASH segments while playing
+  - Click a segment badge to seek playback to that segment position
 - 📱 Responsive web interface
+
+![Streaming UI](docs/image_view.png)
 
 ## Prerequisites
 
@@ -83,27 +89,26 @@ A powerful web application for uploading videos and streaming them using HLS, DA
 
 1. **Upload Video**
    - Click "Choose File" to select an MP4 video file
-   - Select the desired media format (HLS, DASH, RTSP, or CMAF)
+   - Select the desired media format (HLS, DASH, TS, or CMAF)
    - The compatible streaming protocols will be automatically enabled/disabled
-   - Click "Upload & Convert"
+   - Choose **Segment Duration** (seconds) for generated chunks
+   - Set **CRF** (video quality, typical range 18–24)
+   - Choose **Resolution** (Source / 360p / 720p / 1080p)
+   - Click "Upload & Convert" to start packaging and transcoding
 
 2. **Playback Controls**
    - Use the player controls to play/pause the video
    - Adjust volume using the volume slider
    - Toggle fullscreen mode
 
-3. **Resolution Control**
-   - Available resolutions will be detected automatically
-   - Click any resolution button to switch quality
-   - The player will smoothly transition between qualities
+3. **Resolution / Quality Control**
+   - Effective output resolution and quality are determined at upload time by the selected **Resolution** and **CRF** values
+   - Lower resolution and higher CRF values produce smaller files but lower visual quality
 
-4. **Network Simulation**
-   - Test different network conditions:
-     - No throttling (full speed)
-     - Fast 3G (~1.5 Mbps)
-     - Slow 3G (~400 Kbps)
-     - Custom bitrate
-   - The player will automatically adapt to the selected network condition
+4. **Segment Navigation (HLS / DASH)**
+   - While playing a HLS or MPEG-DASH stream, the app displays the list of recently loaded segments under the player
+   - The currently playing segment is highlighted
+   - Click any segment badge to seek playback to that segment (approximate start time = segment index × segment duration)
 
 ## Media Format and Protocol Compatibility
 

@@ -30,6 +30,8 @@ async def convert_video(task_id: int, conversion_tasks: dict, output_dir: str, r
         media_format = task.get('media_format')
         streaming_protocol = task.get('streaming_protocol')
         segment_duration = int(task.get('segment_duration', 6))
+        crf = int(task.get('crf', 20))
+        resolution = task.get('resolution', 'source')
         
         # Validate required fields
         if not all([input_path, output_path, media_format, streaming_protocol]):
@@ -48,9 +50,9 @@ async def convert_video(task_id: int, conversion_tasks: dict, output_dir: str, r
             raise FileNotFoundError(f"Input file not found: {input_path}")
         
         if streaming_protocol == 'hls':
-            await _convert_to_hls(input_path, output_path, task_id, conversion_tasks, segment_duration)
+            await _convert_to_hls(input_path, output_path, task_id, conversion_tasks, segment_duration, crf, resolution)
         elif streaming_protocol == 'dash':
-            await _convert_to_dash(input_path, output_path, task_id, conversion_tasks, segment_duration)
+            await _convert_to_dash(input_path, output_path, task_id, conversion_tasks, segment_duration, crf, resolution)
         elif streaming_protocol == 'rtsp':
             await _start_rtsp_stream(input_path, str(task_id), rtsp_port, task_id, conversion_tasks)
         
@@ -65,17 +67,38 @@ async def convert_video(task_id: int, conversion_tasks: dict, output_dir: str, r
         # Don't re-raise to prevent unhandled exceptions in the background task
         print(f"Task {task_id} failed: {error_msg}")
 
-async def _convert_to_hls(input_path: str, output_path: str, task_id: int, conversion_tasks: dict, segment_duration: int = 6):
+def _build_scale_filter(resolution: str) -> str | None:
+    resolution = (resolution or 'source').lower()
+    if resolution == '360p':
+        return 'scale=-2:360'
+    if resolution == '720p':
+        return 'scale=-2:720'
+    if resolution == '1080p':
+        return 'scale=-2:1080'
+    return None
+
+
+async def _convert_to_hls(input_path: str, output_path: str, task_id: int, conversion_tasks: dict, segment_duration: int = 6, crf: int = 20, resolution: str = 'source'):
     """Convert video to HLS format"""
     # Ensure output directory exists
     output_dir = os.path.dirname(output_path)
     os.makedirs(output_dir, exist_ok=True)
     
+    scale_filter = _build_scale_filter(resolution)
+
     cmd = [
         'ffmpeg',
         '-y',  # Overwrite output files without asking
         '-i', input_path,
         '-c:v', 'libx264',
+        '-preset', 'veryfast',
+        '-crf', str(crf),
+    ]
+
+    if scale_filter:
+        cmd.extend(['-vf', scale_filter])
+
+    cmd.extend([
         '-c:a', 'aac',
         '-hls_time', str(segment_duration),
         '-hls_playlist_type', 'vod',
@@ -83,7 +106,7 @@ async def _convert_to_hls(input_path: str, output_path: str, task_id: int, conve
         '-hls_flags', 'independent_segments',
         '-start_number', '0',  # Start segment numbering from 0
         output_path
-    ]
+    ])
     
     process = await asyncio.create_subprocess_exec(
         *cmd,
@@ -97,12 +120,14 @@ async def _convert_to_hls(input_path: str, output_path: str, task_id: int, conve
         error = await process.stderr.read()
         raise Exception(f"FFmpeg error: {error.decode()}")
 
-async def _convert_to_dash(input_path: str, output_path: str, task_id: int, conversion_tasks: dict, segment_duration: int = 6):
+async def _convert_to_dash(input_path: str, output_path: str, task_id: int, conversion_tasks: dict, segment_duration: int = 6, crf: int = 20, resolution: str = 'source'):
     """Convert video to DASH format"""
     output_dir = os.path.dirname(output_path)
     # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
     
+    scale_filter = _build_scale_filter(resolution)
+
     cmd = [
         'ffmpeg',
         '-y',  # Overwrite output files without asking
@@ -110,6 +135,14 @@ async def _convert_to_dash(input_path: str, output_path: str, task_id: int, conv
         '-map', '0:v:0',
         '-map', '0:a:0',
         '-c:v', 'libx264',
+        '-preset', 'veryfast',
+        '-crf', str(crf),
+    ]
+
+    if scale_filter:
+        cmd.extend(['-vf', scale_filter])
+
+    cmd.extend([
         '-c:a', 'aac',
         '-f', 'dash',
         '-use_timeline', '1',
@@ -121,7 +154,7 @@ async def _convert_to_dash(input_path: str, output_path: str, task_id: int, conv
         '-init_seg_name', 'init-stream$RepresentationID$.$ext$',
         '-media_seg_name', 'chunk-stream$RepresentationID$-$Number%05d$.$ext$',
         output_path
-    ]
+    ])
     
     process = await asyncio.create_subprocess_exec(
         *cmd,
