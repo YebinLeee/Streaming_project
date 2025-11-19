@@ -126,6 +126,22 @@
                 <p id="rtspInfo" class="text-sm text-gray-200 mt-2 hidden"></p>
             </div>
         </div>
+        
+        <!-- Modal for viewing raw segment content -->
+        <div id="segmentModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+            <div class="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[80vh] flex flex-col">
+                <div class="flex items-center justify-between px-4 py-2 border-b">
+                    <h3 class="text-sm font-semibold" id="segmentModalTitle">Segment Content</h3>
+                    <button id="segmentModalClose" class="text-gray-500 hover:text-gray-700 text-sm">✕</button>
+                </div>
+                <div class="p-4 overflow-auto flex-1">
+                    <pre id="segmentModalBody" class="text-xs font-mono whitespace-pre-wrap break-all"></pre>
+                </div>
+                <div class="px-4 py-2 border-t text-xs text-gray-500">
+                    Text manifests(m3u8/mpd)는 그대로, 기타 바이너리는 별도 플레이어/도구로 분석하는 것을 권장합니다.
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -302,7 +318,6 @@
             const order = parseInt(btn.getAttribute('data-order'), 10);
             if (isNaN(order) || !currentSegmentDuration || !videoElement) return;
 
-            // 아주 단순한 모델: 세그먼트 번호 * 세그먼트 길이 ≈ 시작 시각
             const targetTime = order * currentSegmentDuration;
             try {
                 videoElement.currentTime = targetTime;
@@ -311,6 +326,22 @@
                 console.error('Failed to seek to segment', err);
             }
         });
+
+        // Segment modal close
+        (function initSegmentModal() {
+            const modal = document.getElementById('segmentModal');
+            const closeBtn = document.getElementById('segmentModalClose');
+            if (!modal || !closeBtn) return;
+
+            closeBtn.addEventListener('click', () => {
+                modal.classList.add('hidden');
+            });
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.add('hidden');
+                }
+            });
+        })();
 
         function initHlsPlayer(url) {
             clearPlayer();

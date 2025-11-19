@@ -3,7 +3,7 @@
 A powerful web application for uploading videos and streaming them using HLS, DASH, or RTSP protocols with adaptive bitrate streaming and resolution control.
 
 ## Features
-
+![Streaming UI](docs/view_image.png)
 - 🎥 Upload MP4 videos
 - 🔄 Multiple media format support for packaging:
   - HLS (m3u8/ts)
