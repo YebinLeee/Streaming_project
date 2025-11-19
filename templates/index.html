@@ -232,6 +232,8 @@
         let currentPlayer = { hls: null, dash: null };
         let segmentHistory = [];
         const maxSegments = 12;
+        let segmentCounter = 0; // 전체 세그먼트 순번
+        let currentSegmentDuration = 6; // 초 단위, 업로드 시 설정값을 저장
 
         function clearPlayer() {
             if (currentPlayer.hls) {
@@ -245,13 +247,14 @@
             videoElement.removeAttribute('src');
             videoElement.load();
             segmentHistory = [];
+            segmentCounter = 0;
             renderSegmentBar();
         }
 
         function addSegment(type, url) {
             if (!url) return;
             const name = url.split('/').pop() || url;
-            const seg = { type, url, name };
+            const seg = { type, url, name, order: segmentCounter++ };
             // 중복 연속 세그먼트는 패스
             if (segmentHistory.length && segmentHistory[segmentHistory.length - 1].name === name) {
                 return;
@@ -283,6 +286,7 @@
                     return `<button
                         class="px-2 py-0.5 rounded border ${isCurrent ? 'bg-blue-500 text-white border-blue-600' : 'bg-gray-100 text-gray-700 border-gray-300'}"
                         title="${seg.url}"
+                        data-order="${seg.order}"
                         type="button"
                     >
                         ${seg.name}
@@ -290,6 +294,23 @@
                 })
                 .join('');
         }
+
+        // 세그먼트 바 클릭 시 해당 세그먼트 위치로 시킹
+        document.getElementById('segmentBar').addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-order]');
+            if (!btn) return;
+            const order = parseInt(btn.getAttribute('data-order'), 10);
+            if (isNaN(order) || !currentSegmentDuration || !videoElement) return;
+
+            // 아주 단순한 모델: 세그먼트 번호 * 세그먼트 길이 ≈ 시작 시각
+            const targetTime = order * currentSegmentDuration;
+            try {
+                videoElement.currentTime = targetTime;
+                videoElement.play().catch(() => {});
+            } catch (err) {
+                console.error('Failed to seek to segment', err);
+            }
+        });
 
         function initHlsPlayer(url) {
             clearPlayer();
@@ -395,7 +416,9 @@
             formData.append('streaming_protocol', streamingProtocol);
             const segInput = document.getElementById('segmentDuration');
             const segVal = segInput && segInput.value ? parseInt(segInput.value, 10) : 6;
-            formData.append('segment_duration', isNaN(segVal) ? 6 : segVal);
+            const segDurationToUse = isNaN(segVal) ? 6 : segVal;
+            currentSegmentDuration = segDurationToUse;
+            formData.append('segment_duration', segDurationToUse);
 
             setStatus('info', '업로드 및 변환을 시작합니다...');
             playerSection.classList.remove('hidden');
