@@ -77,6 +77,19 @@
                     <p class="mt-1 text-xs text-gray-500" id="protoHint"></p>
                 </div>
 
+                <!-- Segment Duration -->
+                <div>
+                    <label class="block text-gray-700 mb-1" for="segmentDuration">Segment Duration (seconds)</label>
+                    <input
+                        type="number"
+                        id="segmentDuration"
+                        min="1"
+                        value="6"
+                        class="w-32 p-2 border rounded text-sm"
+                    />
+                    <p class="text-xs text-gray-400 mt-1">HLS, DASH, CMAF 모두 이 길이 기준으로 세그먼트가 생성됩니다.</p>
+                </div>
+
                 <button
                     type="submit"
                     class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
@@ -101,6 +114,14 @@
                         playsinline
                         preload="auto"
                     ></video>
+                </div>
+                <!-- Segment navigation bar -->
+                <div class="mt-3">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs font-semibold text-gray-700">Current Segment</span>
+                        <span id="currentSegmentLabel" class="text-xs text-gray-500">-</span>
+                    </div>
+                    <div id="segmentBar" class="flex flex-wrap gap-1 text-[10px]"></div>
                 </div>
                 <p id="rtspInfo" class="text-sm text-gray-200 mt-2 hidden"></p>
             </div>
@@ -209,6 +230,8 @@
         updateProtocolByMediaFormat();
 
         let currentPlayer = { hls: null, dash: null };
+        let segmentHistory = [];
+        const maxSegments = 12;
 
         function clearPlayer() {
             if (currentPlayer.hls) {
@@ -221,6 +244,51 @@
             }
             videoElement.removeAttribute('src');
             videoElement.load();
+            segmentHistory = [];
+            renderSegmentBar();
+        }
+
+        function addSegment(type, url) {
+            if (!url) return;
+            const name = url.split('/').pop() || url;
+            const seg = { type, url, name };
+            // 중복 연속 세그먼트는 패스
+            if (segmentHistory.length && segmentHistory[segmentHistory.length - 1].name === name) {
+                return;
+            }
+            segmentHistory.push(seg);
+            if (segmentHistory.length > maxSegments) {
+                segmentHistory.shift();
+            }
+            renderSegmentBar();
+        }
+
+        function renderSegmentBar() {
+            const bar = document.getElementById('segmentBar');
+            const label = document.getElementById('currentSegmentLabel');
+            if (!bar || !label) return;
+
+            if (!segmentHistory.length) {
+                bar.innerHTML = '';
+                label.textContent = '-';
+                return;
+            }
+
+            const current = segmentHistory[segmentHistory.length - 1];
+            label.textContent = current.name;
+
+            bar.innerHTML = segmentHistory
+                .map((seg, idx) => {
+                    const isCurrent = idx === segmentHistory.length - 1;
+                    return `<button
+                        class="px-2 py-0.5 rounded border ${isCurrent ? 'bg-blue-500 text-white border-blue-600' : 'bg-gray-100 text-gray-700 border-gray-300'}"
+                        title="${seg.url}"
+                        type="button"
+                    >
+                        ${seg.name}
+                    </button>`;
+                })
+                .join('');
         }
 
         function initHlsPlayer(url) {
@@ -232,6 +300,11 @@
                 hls.attachMedia(videoElement);
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
                     videoElement.play().catch(console.error);
+                });
+                hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
+                    if (data && data.frag && data.frag.url) {
+                        addSegment('hls', data.frag.url);
+                    }
                 });
             } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
                 videoElement.src = url;
@@ -246,6 +319,11 @@
             const player = dashjs.MediaPlayer().create();
             currentPlayer.dash = player;
             player.initialize(videoElement, url, true);
+            player.on(dashjs.MediaPlayer.events.FRAGMENT_LOADING_COMPLETED, function(e) {
+                if (e && e.request && e.request.url) {
+                    addSegment('dash', e.request.url);
+                }
+            });
         }
 
         function showRtspInfo(rtspUrl) {
@@ -315,6 +393,9 @@
             formData.append('file', file);
             formData.append('media_format', mediaFormat);
             formData.append('streaming_protocol', streamingProtocol);
+            const segInput = document.getElementById('segmentDuration');
+            const segVal = segInput && segInput.value ? parseInt(segInput.value, 10) : 6;
+            formData.append('segment_duration', isNaN(segVal) ? 6 : segVal);
 
             setStatus('info', '업로드 및 변환을 시작합니다...');
             playerSection.classList.remove('hidden');

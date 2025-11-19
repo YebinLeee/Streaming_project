@@ -13,7 +13,8 @@ router = APIRouter(tags=["upload"])
 async def upload_video(
     file: UploadFile = File(...),
     media_format: str = Form(...),
-    streaming_protocol: str = Form(...)
+    streaming_protocol: str = Form(...),
+    segment_duration: int = Form(6)
 ):
     task_id = None
     try:
@@ -91,6 +92,7 @@ async def upload_video(
             'output': output_path,
             'media_format': media_format,
             'streaming_protocol': streaming_protocol,
+            'segment_duration': int(segment_duration),
             'status': 'pending',
             'progress': 0,
             'error': None

@@ -29,6 +29,7 @@ async def convert_video(task_id: int, conversion_tasks: dict, output_dir: str, r
         output_path = task.get('output')
         media_format = task.get('media_format')
         streaming_protocol = task.get('streaming_protocol')
+        segment_duration = int(task.get('segment_duration', 6))
         
         # Validate required fields
         if not all([input_path, output_path, media_format, streaming_protocol]):
@@ -47,9 +48,9 @@ async def convert_video(task_id: int, conversion_tasks: dict, output_dir: str, r
             raise FileNotFoundError(f"Input file not found: {input_path}")
         
         if streaming_protocol == 'hls':
-            await _convert_to_hls(input_path, output_path, task_id, conversion_tasks)
+            await _convert_to_hls(input_path, output_path, task_id, conversion_tasks, segment_duration)
         elif streaming_protocol == 'dash':
-            await _convert_to_dash(input_path, output_path, task_id, conversion_tasks)
+            await _convert_to_dash(input_path, output_path, task_id, conversion_tasks, segment_duration)
         elif streaming_protocol == 'rtsp':
             await _start_rtsp_stream(input_path, str(task_id), rtsp_port, task_id, conversion_tasks)
         
@@ -64,7 +65,7 @@ async def convert_video(task_id: int, conversion_tasks: dict, output_dir: str, r
         # Don't re-raise to prevent unhandled exceptions in the background task
         print(f"Task {task_id} failed: {error_msg}")
 
-async def _convert_to_hls(input_path: str, output_path: str, task_id: int, conversion_tasks: dict):
+async def _convert_to_hls(input_path: str, output_path: str, task_id: int, conversion_tasks: dict, segment_duration: int = 6):
     """Convert video to HLS format"""
     # Ensure output directory exists
     output_dir = os.path.dirname(output_path)
@@ -76,7 +77,7 @@ async def _convert_to_hls(input_path: str, output_path: str, task_id: int, conve
         '-i', input_path,
         '-c:v', 'libx264',
         '-c:a', 'aac',
-        '-hls_time', '6',
+        '-hls_time', str(segment_duration),
         '-hls_playlist_type', 'vod',
         '-hls_segment_filename', output_path.replace('.m3u8', '_%03d.ts'),
         '-hls_flags', 'independent_segments',
@@ -96,7 +97,7 @@ async def _convert_to_hls(input_path: str, output_path: str, task_id: int, conve
         error = await process.stderr.read()
         raise Exception(f"FFmpeg error: {error.decode()}")
 
-async def _convert_to_dash(input_path: str, output_path: str, task_id: int, conversion_tasks: dict):
+async def _convert_to_dash(input_path: str, output_path: str, task_id: int, conversion_tasks: dict, segment_duration: int = 6):
     """Convert video to DASH format"""
     output_dir = os.path.dirname(output_path)
     # Ensure output directory exists
@@ -113,8 +114,8 @@ async def _convert_to_dash(input_path: str, output_path: str, task_id: int, conv
         '-f', 'dash',
         '-use_timeline', '1',
         '-use_template', '1',
-        '-seg_duration', '6',
-        '-frag_duration', '6',
+        '-seg_duration', str(segment_duration),
+        '-frag_duration', str(segment_duration),
         '-window_size', '5',
         '-adaptation_sets', 'id=0,streams=v id=1,streams=a',
         '-init_seg_name', 'init-stream$RepresentationID$.$ext$',
