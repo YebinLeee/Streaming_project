@@ -126,20 +126,24 @@ A powerful web application for uploading videos and streaming them using HLS, DA
 |------|------|
 | **HTTP Method** | `POST` |
 | **URL** | `/api/v1/upload/` |
+
 | **Request Body (form-data)** | 
+|--------|
 `- file`: MP4 파일, 필수<br>
-`- media_format`: `hls` \| `ts` \| `cmaf` \| `dash`<br>
-`- streaming_protocol`: `hls` \| `dash` \| `rtsp`<br>
-`- segment_duration` (int, 기본값 6)<br>
-`- crf` (int, 기본값 20)<br>
-`- resolution`: `source` \| `360p` \| `720p` \| `1080p` |
+`- media_format`: hls(m3u8/ts) \| mpeg2-ts \| cmaf(mpd/fmp4) \| dash(mpd/fmp4) <br>
+`- streaming_protocol`: hls \| dash \| rtsp <br>
+`- segment_duration` (int, 기본값 6) <br>
+`- crf` (int, 기본값 20) <br>
+`- resolution`: source \| 360p \| 720p \| 1080p |
+
 | **Success Response (200)** | 
-JSON 객체<br>
+|--------|
+JSON<br>
 `- task_id`: 생성된 작업 ID<br>
-`- status`: 작업 상태 (예: `processing`)<br>
+`- status`: 작업 상태 (예: processing)<br>
 `- output_path`: 생성된 출력 파일/플레이리스트 경로<br>
-`- stream_url`: 스트림 정보를 조회하는 엔드포인트 (예: `/api/v1/stream/{task_id}`)<br>
-`- status_url`: 작업 상태 조회 엔드포인트 (예: `/api/v1/tasks/{task_id}`) |
+`- stream_url`: 스트림 정보를 조회하는 엔드포인트 (예: /api/v1/stream/{task_id})<br>
+`- status_url`: 작업 상태 조회 엔드포인트 (예: /api/v1/tasks/{task_id}) |
 
 #### 예시 Request Body (multipart/form-data 개념 JSON 표현)
 
@@ -175,9 +179,13 @@ JSON 객체<br>
 |------|------|
 | **HTTP Method** | `GET` |
 | **URL** | `/api/v1/tasks/{task_id}` |
+
 | **Path Params** | 
-`- task_id` (int): 업로드/변환 작업 ID |
+|-----------|
+- `task_id` (int): 업로드/변환 작업 ID 
+
 | **Success Response (200)** | 
+|----------|
 JSON 객체<br>
 `- task_id`<br>
 `- status`<br>
@@ -203,8 +211,10 @@ JSON 객체<br>
 |------|------|
 | **HTTP Method** | `GET` |
 | **URL** | `/api/v1/tasks/` |
-| **Query Params** | 없음 |
+
+
 | **Success Response (200)** | 
+|----------|
 작업 리스트<br>
 각 항목: `task_id`, `status`, `filename`, `created_at` |
 
@@ -235,9 +245,13 @@ JSON 객체<br>
 |------|------|
 | **HTTP Method** | `GET` |
 | **URL** | `/api/v1/stream/{task_id}` |
+
 | **Path Params** | 
+|-----------|
 `- task_id` (int): 업로드/변환 작업 ID |
+
 | **Success Response (200)** | 
+|----------|
 JSON 객체<br>
 `- hls_url`<br>
 `- dash_url`<br>
@@ -263,14 +277,21 @@ JSON 객체<br>
 |------|------|
 | **HTTP Method** | `GET` |
 | **URL** | `/api/v1/chunks/{task_id}` |
+
 | **Path Params** | 
+|-----------|
 `- task_id` (int): 업로드/변환 작업 ID |
+
 | **Query Params** | 
+|-----------|
 `- chunk_name` (예: `playlist.m3u8`, `segment_000.ts`, `playlist.mpd` 등)<br>
 `- chunk_type` = `hls` \| `dash` |
-| **Success Response (200)** | 요청한 미디어 조각 파일 (`FileResponse`) |
 
-##### 예시 Query + Response
+| **Success Response (200)** | 
+|----------|
+요청한 미디어 조각 파일 (`FileResponse`) |
+
+#### 예시 Query + Response
 
 - Request 예시:
 
