@@ -43,7 +43,7 @@ A powerful web application for uploading videos and streaming them using HLS, DA
 
 2. **Build and start the containers**:
    ```bash
-   docker-compose up --build
+   docker compose up --build
    ```
 
 3. **Access the application**:
@@ -52,7 +52,7 @@ A powerful web application for uploading videos and streaming them using HLS, DA
 
 4. **Stopping the application**:
    ```bash
-   docker-compose down
+   docker compose down
    ```
 
 ## Manual Installation
@@ -137,6 +137,32 @@ JSON 객체<br>
 `- stream_url`: 스트림 정보를 조회하는 엔드포인트 (예: `/api/v1/stream/{task_id}`)<br>
 `- status_url`: 작업 상태 조회 엔드포인트 (예: `/api/v1/tasks/{task_id}`) |
 
+#### 예시 Request Body (multipart/form-data 개념 JSON 표현)
+
+```json
+{
+  "file": "<binary MP4>",
+  "media_format": "hls",
+  "streaming_protocol": "hls",
+  "segment_duration": 6,
+  "crf": 20,
+  "resolution": "source"
+}
+```
+
+#### 예시 Success Response (200)
+
+```json
+{
+  "task_id": 1,
+  "status": "processing",
+  "message": "Upload and conversion started",
+  "output_path": "static/output/example_1234/playlist.m3u8",
+  "stream_url": "/api/v1/stream/1",
+  "status_url": "/api/v1/tasks/1"
+}
+```
+
 ### Task APIs
 
 #### 단일 작업 상태 조회
@@ -155,6 +181,18 @@ JSON 객체<br>
 `- error`<br>
 `- stream_url` |
 
+##### 예시 Response (200)
+
+```json
+{
+  "task_id": 1,
+  "status": "completed",
+  "progress": 100,
+  "error": null,
+  "stream_url": "/api/v1/stream/1"
+}
+```
+
 #### 작업 리스트 조회
 
 | 항목 | 내용 |
@@ -165,6 +203,25 @@ JSON 객체<br>
 | **Success Response (200)** | 
 작업 리스트<br>
 각 항목: `task_id`, `status`, `filename`, `created_at` |
+
+##### 예시 Response (200)
+
+```json
+[
+  {
+    "task_id": 1,
+    "status": "completed",
+    "filename": "example_1234.mp4",
+    "created_at": "2025-11-21T01:23:45Z"
+  },
+  {
+    "task_id": 2,
+    "status": "processing",
+    "filename": "sample_5678.mp4",
+    "created_at": "2025-11-21T01:25:10Z"
+  }
+]
+```
 
 ### Streaming APIs
 
@@ -184,6 +241,18 @@ JSON 객체<br>
 `- streaming_protocol` (`hls`/`dash`/`rtsp`)<br>
 `- status` |
 
+##### 예시 Response (200)
+
+```json
+{
+  "hls_url": "/static/output/example_1234/playlist.m3u8",
+  "dash_url": null,
+  "rtsp_url": null,
+  "streaming_protocol": "hls",
+  "status": "completed"
+}
+```
+
 #### 세그먼트(Chunk) 파일 조회
 
 | 항목 | 내용 |
@@ -196,6 +265,17 @@ JSON 객체<br>
 `- chunk_name` (예: `playlist.m3u8`, `segment_000.ts`, `playlist.mpd` 등)<br>
 `- chunk_type` = `hls` \| `dash` |
 | **Success Response (200)** | 요청한 미디어 조각 파일 (`FileResponse`) |
+
+##### 예시 Query + Response
+
+- Request 예시:
+
+```http
+GET /api/v1/chunks/1?chunk_name=playlist.m3u8&chunk_type=hls
+```
+
+- Response: HLS 플레이리스트 텍스트 (`application/vnd.apple.mpegurl`)
+
 
 ## Media Format and Protocol Compatibility
 
