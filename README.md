@@ -5,11 +5,11 @@ A powerful web application for uploading videos and streaming them using HLS, DA
 ## Features
 ![Streaming UI](docs/image.png)
 - 🎥 Upload MP4 videos
-- 🔄 Multiple media format support for packaging:
-  - HLS (m3u8/ts)
-  - TS (Transport Stream)
-  - fMP4/MPD (MPEG-DASH)
-  - CMAF (supports both HLS and DASH)
+- 🔄 Multiple media format support for packaging (output layout):
+  - **HLS**: `playlist.m3u8` + `*.ts` segments
+  - **DASH**: `playlist.mpd` + fragmented MP4 (`*.m4s`, `init-*.mp4`) segments
+  - **CMAF**: CMAF-compatible fragmented MP4 segments that can be exposed as HLS(DASH) playlists
+  - **RTSP (TS)**: MPEG‑TS over RTSP for low-latency streaming
 - 🌐 Streaming protocols:
   - HLS (HTTP Live Streaming)
   - MPEG-DASH
@@ -89,7 +89,11 @@ A powerful web application for uploading videos and streaming them using HLS, DA
 
 1. **Upload Video**
    - Click "Choose File" to select an MP4 video file
-   - Select the desired media format (HLS, DASH, TS, or CMAF)
+   - Select the desired **media format** (패키징 방식)
+     - `hls`  → HLS: `m3u8 + TS` 세그먼트
+     - `dash` → DASH: `mpd + fMP4` 세그먼트
+     - `cmaf` → CMAF 기반(HLS/DASH 겸용) 패키징
+     - `ts`   → TS 기반 패키징 (내부적으로 HLS 파이프라인을 사용, 주로 RTSP와 조합)
    - The compatible streaming protocols will be automatically enabled/disabled
    - Choose **Segment Duration** (seconds) for generated chunks
    - Set **CRF** (video quality, typical range 18–24)
@@ -279,12 +283,39 @@ GET /api/v1/chunks/1?chunk_name=playlist.m3u8&chunk_type=hls
 
 ## Media Format and Protocol Compatibility
 
-| | HLS | MPEG-DASH | RTSP |
-|--------------|-----|-----------|------|
-| HLS (m3u8/ts)  | O  | X        | X   |
-| MPEG-DASH (mpd/ts)    | X  | O        | X   |
-| RTSP (MPEG-2 TS)    | X  | X        | O   |
-| CMAF (m3u8/ts/mpd/ts)         | O  | O        | X   |
+> **Note**: `media_format`는 출력 파일 구조(패키징)를 의미하고,
+> `streaming_protocol`은 클라이언트가 접근하는 방법(HLS/DASH/RTSP)을 의미합니다.
+
+| Packaging format (media_format 기준) | HLS (HTTP) | MPEG-DASH (HTTP) | RTSP |
+|--------------------------------------|------------|-------------------|------|
+| HLS (`hls`) – `m3u8 + TS`            | O          | X                 | X    |
+| DASH (`dash`) – `mpd + fMP4`         | X          | O                 | X    |
+| TS (`ts`) – MPEG‑TS segments         | X          | X                 | O*   |
+| CMAF (`cmaf`) – CMAF fMP4 segments   | O (HLS-CMAF) | O (DASH-CMAF)   | X    |
+
+`*` TS 포맷은 내부적으로 HLS 파이프라인을 사용하지만, 주 사용 목적은 RTSP(MPEG‑TS over RTSP)와의 조합입니다.
+
+### RTSP Playback Example
+
+- **기본 RTSP 포트**: `8554` (환경변수 `RTSP_PORT`로 설정 가능)
+- 업로드 시 `streaming_protocol=rtsp` 로 작업을 생성하면, 내부적으로 FFmpeg RTSP 서버가 다음과 같이 뜹니다.
+
+#### 예시 RTSP URL
+
+- 로컬 서버 기준:
+  - `rtsp://localhost:8554/<stream_id>`
+  - 예: `rtsp://localhost:8554/1`
+- 원격 서버(예: 192.168.0.10) 기준:
+  - `rtsp://192.168.0.10:8554/<stream_id>`
+
+`stream_id`는 업로드/변환 작업에 매핑된 스트림 ID이며, RTSP 전용 업로드 후 `/api/v1/stream/{task_id}` 응답의 `rtsp_url` 필드에서 확인할 수 있습니다.
+
+#### VLC에서 여는 방법
+
+1. VLC 실행
+2. **Media → Open Network Stream...** 메뉴 선택
+3. "Network URL" 입력 필드에 위의 RTSP URL 입력 (예: `rtsp://localhost:8554/1`)
+4. **Play** 버튼 클릭 → RTSP 스트림 재생
 
 ## Docker Configuration
 
