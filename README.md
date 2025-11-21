@@ -2,6 +2,25 @@
 
 A web application for uploading video files and streaming them via HLS, MPEG‑DASH, or RTSP. The app focuses on packaging/transcoding, basic encoding control, and inspecting generated segments.
 
+## Table of Contents
+
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [Docker Installation (Recommended)](#docker-installation-recommended)
+- [Manual Installation](#manual-installation)
+- [Running the Application](#running-the-application)
+- [Usage](#usage)
+- [API Overview](#api-overview)
+  - [Upload API](#upload-api)
+  - [Task APIs](#task-apis)
+  - [Streaming APIs](#streaming-apis)
+- [Media Format and Protocol Compatibility](#media-format-and-protocol-compatibility)
+  - [RTSP Playback Example](#rtsp-playback-example)
+- [Docker Configuration](#docker-configuration)
+- [FFmpeg Command Details](#ffmpeg-command-details)
+- [Project Structure](#project-structure)
+- [License](#license)
+
 ## Features
 ![Streaming UI](docs/image.png)
 - 🎥 Upload MP4/MOV and other common video files
