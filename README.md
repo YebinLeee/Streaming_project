@@ -1,26 +1,26 @@
 # Video Streaming Application
 
-A powerful web application for uploading videos and streaming them using HLS, DASH, or RTSP protocols with adaptive bitrate streaming and resolution control.
+A web application for uploading video files and streaming them via HLS, MPEG‑DASH, or RTSP. The app focuses on packaging/transcoding, basic encoding control, and inspecting generated segments.
 
 ## Features
 ![Streaming UI](docs/image.png)
-- 🎥 Upload MP4 videos
-- 🔄 Multiple media format support for packaging (output layout):
-  - **HLS**: `playlist.m3u8` + `*.ts` segments
-  - **DASH**: `playlist.mpd` + fragmented MP4 (`*.m4s`, `init-*.mp4`) segments
-  - **CMAF**: CMAF (Common Media Application Format) fragmented MP4 – 공통 fMP4 자산을 만들어 두고, 이를 HLS나 DASH 매니페스트에서 재사용할 수 있는 형식
-  - **RTSP (TS)**: MPEG‑TS over RTSP for low-latency streaming
+- 🎥 Upload MP4/MOV and other common video files
+- 🔄 Multiple media formats for packaging (output layout):
+  - **HLS**: `playlist.m3u8` + `*.ts` segments (MPEG‑TS)
+  - **DASH**: `playlist.mpd` + fragmented MP4 segments (`*.m4s`, `init-*.mp4`)
+  - **CMAF**: CMAF (Common Media Application Format) fragmented MP4 – common fMP4 assets that can be referenced from both HLS and DASH manifests
+  - **RTSP (TS)**: MPEG‑TS over RTSP for low‑latency streaming
 - 🌐 Streaming protocols:
   - HLS (HTTP Live Streaming)
-  - MPEG-DASH
+  - MPEG‑DASH
   - RTSP (Real Time Streaming Protocol)
 - 🎚️ Encoding controls per upload:
   - Segment duration (seconds) for HLS/DASH/CMAF
-  - CRF (H.264 quality, lower = higher quality)
+  - CRF for H.264 quality (lower = higher quality and larger file size)
   - Output resolution toggle (Source / 360p / 720p / 1080p)
 - 🧭 Segment navigation UI:
-  - Shows currently loaded HLS/DASH segments while playing
-  - Click a segment badge to seek playback to that segment position
+  - Shows recently loaded HLS/DASH segments while playing
+  - Click a segment badge to seek playback to that segment (approximate start time = index × segment duration)
 - 📱 Responsive web interface
 
 ![Streaming UI](docs/image_view.png)
@@ -88,17 +88,17 @@ A powerful web application for uploading videos and streaming them using HLS, DA
 ## Usage
 
 1. **Upload Video**
-   - Click "Choose File" to select an MP4 video file
-   - Select the desired **media format** (패키징 방식)
-     - `hls`  → HLS: `m3u8 + TS` 세그먼트
-     - `dash` → DASH: `mpd + fMP4` 세그먼트
-     - `cmaf` → CMAF 기반 패키징 (공통 fMP4 세그먼트를 생성하고, 이를 HLS/DASH에서 사용할 수 있음)
-     - `ts`   → TS 기반 패키징 (내부적으로 HLS 파이프라인을 사용, 주로 RTSP와 조합)
+   - Click "Choose File" to select a video file (MP4, MOV, etc.)
+   - Select the desired **media format** (packaging layout):
+     - `hls`  → HLS: `m3u8 + TS` segments
+     - `dash` → DASH: `mpd + fMP4` segments
+     - `cmaf` → CMAF‑based packaging (common fMP4 segments that can be referenced by HLS/DASH)
+     - `ts`   → TS‑based packaging (internally uses the HLS pipeline, mainly combined with RTSP)
    - The compatible streaming protocols will be automatically enabled/disabled
-   - Choose **Segment Duration** (seconds) for generated chunks
+   - Choose **Segment Duration** (seconds) for generated segments
    - Set **CRF** (video quality, typical range 18–24)
    - Choose **Resolution** (Source / 360p / 720p / 1080p)
-   - Click "Upload & Convert" to start packaging and transcoding
+   - Click **Upload & Convert** to start packaging and transcoding
 
 2. **Playback Controls**
    - Use the player controls to play/pause the video
@@ -110,7 +110,7 @@ A powerful web application for uploading videos and streaming them using HLS, DA
    - Lower resolution and higher CRF values produce smaller files but lower visual quality
 
 4. **Segment Navigation (HLS / DASH)**
-   - While playing a HLS or MPEG-DASH stream, the app displays the list of recently loaded segments under the player
+   - While playing an HLS or MPEG‑DASH stream, the app displays the list of recently loaded segments under the player
    - The currently playing segment is highlighted
    - Click any segment badge to seek playback to that segment (approximate start time = segment index × segment duration)
 
@@ -122,28 +122,23 @@ A powerful web application for uploading videos and streaming them using HLS, DA
 
 ### Upload API
 
-| 항목 | 내용 |
-|------|------|
+| Field | Description |
+|-------|-------------|
 | **HTTP Method** | `POST` |
 | **URL** | `/api/v1/upload/` |
 
-| **Request Body (form-data)** | 
-|--------|
-`- file`: MP4 파일, 필수<br>
-`- media_format`: hls(m3u8/ts) \| mpeg2-ts \| cmaf(mpd/fmp4) \| dash(mpd/fmp4) <br>
-`- streaming_protocol`: hls \| dash \| rtsp <br>
-`- segment_duration` (int, 기본값 6) <br>
-`- crf` (int, 기본값 20) <br>
-`- resolution`: source \| 360p \| 720p \| 1080p |
+| Request Body (form-data) | Description |
+|--------------------------|-------------|
+| `file` | Input video file (MP4, MOV, etc.), required |
+| `media_format` | `hls` (m3u8/ts) \| `ts` (MPEG‑2 TS) \| `cmaf` (mpd/fMP4) \| `dash` (mpd/fMP4) |
+| `streaming_protocol` | `hls` \| `dash` \| `rtsp` |
+| `segment_duration` | Segment length in seconds (int, default: `6`) |
+| `crf` | CRF for H.264 encoding (int, default: `20`) |
+| `resolution` | `source` \| `360p` \| `720p` \| `1080p` |
 
-| **Success Response (200)** | 
-|--------|
-JSON<br>
-`- task_id`: 생성된 작업 ID<br>
-`- status`: 작업 상태 (예: processing)<br>
-`- output_path`: 생성된 출력 파일/플레이리스트 경로<br>
-`- stream_url`: 스트림 정보를 조회하는 엔드포인트 (예: /api/v1/stream/{task_id})<br>
-`- status_url`: 작업 상태 조회 엔드포인트 (예: /api/v1/tasks/{task_id}) |
+| Success Response (200) | Description |
+|------------------------|-------------|
+| JSON | Response object containing: `task_id`, `status`, `output_path`, `stream_url`, `status_url` |
 
 #### 예시 Request Body (multipart/form-data 개념 JSON 표현)
 
@@ -173,25 +168,20 @@ JSON<br>
 
 ### Task APIs
 
-#### 단일 작업 상태 조회
+#### Get task status
 
-| 항목 | 내용 |
-|------|------|
+| Field | Description |
+|-------|-------------|
 | **HTTP Method** | `GET` |
 | **URL** | `/api/v1/tasks/{task_id}` |
 
-| **Path Params** | 
-|-----------|
-- `task_id` (int): 업로드/변환 작업 ID 
+| Path Params | Description |
+|------------|-------------|
+| `task_id` (int) | Upload/conversion task ID |
 
-| **Success Response (200)** | 
-|----------|
-JSON 객체<br>
-`- task_id`<br>
-`- status`<br>
-`- progress`<br>
-`- error`<br>
-`- stream_url` |
+| Success Response (200) | Description |
+|------------------------|-------------|
+| JSON | `task_id`, `status`, `progress`, `error`, `stream_url` |
 
 ##### 예시 Response (200)
 
@@ -205,18 +195,16 @@ JSON 객체<br>
 }
 ```
 
-#### 작업 리스트 조회
+#### List tasks
 
-| 항목 | 내용 |
-|------|------|
+| Field | Description |
+|-------|-------------|
 | **HTTP Method** | `GET` |
 | **URL** | `/api/v1/tasks/` |
 
-
-| **Success Response (200)** | 
-|----------|
-작업 리스트<br>
-각 항목: `task_id`, `status`, `filename`, `created_at` |
+| Success Response (200) | Description |
+|------------------------|-------------|
+| JSON array | Each item contains: `task_id`, `status`, `filename`, `created_at` |
 
 ##### 예시 Response (200)
 
@@ -239,25 +227,20 @@ JSON 객체<br>
 
 ### Streaming APIs
 
-#### 스트림 정보 조회
+#### Get stream info
 
-| 항목 | 내용 |
-|------|------|
+| Field | Description |
+|-------|-------------|
 | **HTTP Method** | `GET` |
 | **URL** | `/api/v1/stream/{task_id}` |
 
-| **Path Params** | 
-|-----------|
-`- task_id` (int): 업로드/변환 작업 ID |
+| Path Params | Description |
+|------------|-------------|
+| `task_id` (int) | Upload/conversion task ID |
 
-| **Success Response (200)** | 
-|----------|
-JSON 객체<br>
-`- hls_url`<br>
-`- dash_url`<br>
-`- rtsp_url`<br>
-`- streaming_protocol` (`hls`/`dash`/`rtsp`)<br>
-`- status` |
+| Success Response (200) | Description |
+|------------------------|-------------|
+| JSON | `hls_url`, `dash_url`, `rtsp_url`, `streaming_protocol` (`hls`/`dash`/`rtsp`), `status` |
 
 ##### 예시 Response (200)
 
@@ -271,72 +254,72 @@ JSON 객체<br>
 }
 ```
 
-#### 세그먼트(Chunk) 파일 조회
+#### Get segment (chunk) file
 
-| 항목 | 내용 |
-|------|------|
+| Field | Description |
+|-------|-------------|
 | **HTTP Method** | `GET` |
 | **URL** | `/api/v1/chunks/{task_id}` |
 
-| **Path Params** | 
-|-----------|
-`- task_id` (int): 업로드/변환 작업 ID |
+| Path Params | Description |
+|------------|-------------|
+| `task_id` (int) | Upload/conversion task ID |
 
-| **Query Params** | 
-|-----------|
-`- chunk_name` (예: `playlist.m3u8`, `segment_000.ts`, `playlist.mpd` 등)<br>
-`- chunk_type` = `hls` \| `dash` |
+| Query Params | Description |
+|-------------|-------------|
+| `chunk_name` | File name (e.g., `playlist.m3u8`, `segment_000.ts`, `playlist.mpd`, etc.) |
+| `chunk_type` | `hls` \| `dash` |
 
-| **Success Response (200)** | 
-|----------|
-요청한 미디어 조각 파일 (`FileResponse`) |
+| Success Response (200) | Description |
+|------------------------|-------------|
+| File | The requested media chunk (`FileResponse`) |
 
-#### 예시 Query + Response
+#### Example query and response
 
-- Request 예시:
+- Example request:
 
 ```http
 GET /api/v1/chunks/1?chunk_name=playlist.m3u8&chunk_type=hls
 ```
 
-- Response: HLS 플레이리스트 텍스트 (`application/vnd.apple.mpegurl`)
+-- Response: HLS playlist text (`application/vnd.apple.mpegurl`)
 
 
 ## Media Format and Protocol Compatibility
 
-> **Note**: `media_format`는 출력 파일 구조(패키징)를 의미하고,
-> `streaming_protocol`은 클라이언트가 접근하는 방법(HLS/DASH/RTSP)을 의미합니다.
+> **Note**: `media_format` describes the output file layout (packaging),
+> while `streaming_protocol` describes how the client accesses the stream (HLS/DASH/RTSP).
 
-| Packaging format (media_format 기준) | HLS (HTTP) | MPEG-DASH (HTTP) | RTSP |
-|--------------------------------------|------------|-------------------|------|
-| HLS (`hls`) – `m3u8 + TS`            | O          | X                 | X    |
-| DASH (`dash`) – `mpd + fMP4`         | X          | O                 | X    |
-| TS (`ts`) – MPEG‑TS segments         | X          | X                 | O*   |
-| CMAF (`cmaf`) – CMAF fMP4 segments   | O (HLS에서 사용 가능) | O (DASH에서 사용 가능) | X    |
+| Packaging format (by `media_format`) | HLS (HTTP) | MPEG‑DASH (HTTP) | RTSP |
+|--------------------------------------|------------|------------------|------|
+| HLS (`hls`) – `m3u8 + TS`            | ✔          | ✖                | ✖    |
+| DASH (`dash`) – `mpd + fMP4`         | ✖          | ✔                | ✖    |
+| TS (`ts`) – MPEG‑TS segments         | ✖          | ✖                | ✔*   |
+| CMAF (`cmaf`) – CMAF fMP4 segments   | ✔ (usable by HLS) | ✔ (usable by DASH) | ✖ |
 
-`*` TS 포맷은 내부적으로 HLS 파이프라인을 사용하지만, 주 사용 목적은 RTSP(MPEG‑TS over RTSP)와의 조합입니다.
+`*` TS format internally uses the HLS packaging pipeline in this project, but its primary usage is in combination with RTSP (MPEG‑TS over RTSP).
 
 ### RTSP Playback Example
 
-- **기본 RTSP 포트**: `8554` (환경변수 `RTSP_PORT`로 설정 가능)
-- 업로드 시 `streaming_protocol=rtsp` 로 작업을 생성하면, 내부적으로 FFmpeg RTSP 서버가 다음과 같이 뜹니다.
+- **Default RTSP port**: `8554` (configurable via `RTSP_PORT` environment variable)
+- When you upload with `streaming_protocol=rtsp`, an internal FFmpeg RTSP server is started for the given stream.
 
-#### 예시 RTSP URL
+#### Example RTSP URLs
 
-- 로컬 서버 기준:
+- Local server:
   - `rtsp://localhost:8554/<stream_id>`
-  - 예: `rtsp://localhost:8554/1`
-- 원격 서버(예: 192.168.0.10) 기준:
+  - Example: `rtsp://localhost:8554/1`
+- Remote server (e.g., `192.168.0.10`):
   - `rtsp://192.168.0.10:8554/<stream_id>`
 
-`stream_id`는 업로드/변환 작업에 매핑된 스트림 ID이며, RTSP 전용 업로드 후 `/api/v1/stream/{task_id}` 응답의 `rtsp_url` 필드에서 확인할 수 있습니다.
+`stream_id` is associated with the upload/conversion task and can be obtained from the `rtsp_url` field of `/api/v1/stream/{task_id}` when using RTSP.
 
-#### VLC에서 여는 방법
+#### How to open in VLC
 
-1. VLC 실행
-2. **Media → Open Network Stream...** 메뉴 선택
-3. "Network URL" 입력 필드에 위의 RTSP URL 입력 (예: `rtsp://localhost:8554/1`)
-4. **Play** 버튼 클릭 → RTSP 스트림 재생
+1. Launch VLC
+2. Open **Media → Open Network Stream...**
+3. Enter the RTSP URL (e.g., `rtsp://localhost:8554/1`) in the "Network URL" field
+4. Click **Play** to start RTSP playback
 
 ## Docker Configuration
 
@@ -354,6 +337,89 @@ The Docker setup includes:
   - `UPLOAD_DIR`: Directory for uploaded files (default: `/app/uploads`)
   - `OUTPUT_DIR`: Directory for processed files (default: `/app/static/output`)
   - `RTSP_PORT`: RTSP streaming port (default: `8554`)
+
+## FFmpeg Command Details
+
+This project uses FFmpeg in `services/video_converter.py` to convert uploaded files into HLS, DASH, and RTSP streams. The key commands and options are summarized below.
+
+### HLS conversion (`_convert_to_hls`)
+
+Conceptual command structure:
+
+```bash
+ffmpeg -y -i <input> \
+  -c:v libx264 -preset veryfast -crf <crf> [ -vf scale=... ] \
+  -c:a aac \
+  -hls_time <segment_duration> \
+  -hls_playlist_type vod \
+  -hls_segment_filename playlist_%03d.ts \
+  -hls_flags independent_segments \
+  -start_number 0 \
+  <output>.m3u8
+```
+
+- `-y`: Overwrite existing output files without asking
+- `-c:v libx264`: Re‑encode video as H.264 (AVC)
+- `-preset veryfast`: Encoding speed/efficiency trade‑off (fast preset for development/testing)
+- `-crf <value>`: H.264 quality control (lower = higher quality and larger size, typical range 18–24)
+- `-vf scale=...`: Change resolution based on the `resolution` setting (e.g., 360p/720p/1080p)
+- `-c:a aac`: Encode audio as AAC
+- `-hls_time`: Segment length in seconds (e.g., 6 → roughly 6‑second TS segments)
+- `-hls_playlist_type vod`: VOD‑style HLS playlist
+- `-hls_segment_filename`: Pattern for segment file names (e.g., `playlist_000.ts`)
+- `-hls_flags independent_segments`: Force segment boundaries at independent GOPs for stable seeking/switching
+- `-start_number 0`: Start segment numbering at 0
+
+### DASH conversion (`_convert_to_dash`)
+
+Conceptual command structure:
+
+```bash
+ffmpeg -y -i <input> \
+  -map 0:v:0 -map 0:a:0 \
+  -c:v libx264 -preset veryfast -crf <crf> [ -vf scale=... ] \
+  -c:a aac \
+  -f dash \
+  -use_timeline 1 -use_template 1 \
+  -seg_duration <segment_duration> \
+  -frag_duration <segment_duration> \
+  -window_size 5 \
+  -adaptation_sets "id=0,streams=v id=1,streams=a" \
+  -init_seg_name "init-stream$RepresentationID$.$ext$" \
+  -media_seg_name "chunk-stream$RepresentationID$-$Number%05d$.$ext$" \
+  <output>.mpd
+```
+
+- `-map 0:v:0 -map 0:a:0`: Explicitly select the first video and audio tracks
+- `-c:v libx264`, `-preset`, `-crf`, `-vf`, `-c:a aac`: Same encoding settings as HLS
+- `-f dash`: Output as MPEG‑DASH (MPD + fMP4 segments)
+- `-use_timeline 1`, `-use_template 1`: Use timeline and template addressing in the MPD
+- `-seg_duration`, `-frag_duration`: Segment/fragment duration in seconds
+- `-window_size 5`: Sliding window size (more relevant for live, but usable for VOD as well)
+- `-adaptation_sets`: Define separate AdaptationSets for video and audio
+- `-init_seg_name`, `-media_seg_name`: File name patterns for init and media segments
+
+### RTSP streaming (`_start_rtsp_stream`)
+
+Conceptual command structure:
+
+```bash
+ffmpeg -re -stream_loop -1 -i <input> \
+  -c:v libx264 -preset veryfast -tune zerolatency \
+  -f rtsp rtsp://0.0.0.0:<RTSP_PORT>/<stream_id>
+```
+
+- `-re`: Read input at its native frame rate (approximate real‑time behavior)
+- `-stream_loop -1`: Loop the input file indefinitely (useful for demo/testing)
+- `-c:v libx264 -preset veryfast`: Real‑time H.264 encoding
+- `-tune zerolatency`: Reduce latency by minimizing buffering
+- `-f rtsp`: Output via RTSP protocol
+- `rtsp://0.0.0.0:<port>/<stream_id>`: Bind the RTSP server to all interfaces inside the container
+
+These options are tuned for a simple demo/development setup. In a production environment you would typically:
+
+- Adjust `crf`, `preset`, and `resolution` to balance quality, bitrate, and CPU usage
+- Extend the HLS/DASH pipelines with multiple resolutions/bitrates (ABR) using additional `-map`, `scale`, and, for HLS, `-var_stream_map` configurations
 
 ## Project Structure
 
