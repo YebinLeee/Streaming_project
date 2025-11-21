@@ -8,7 +8,7 @@ A powerful web application for uploading videos and streaming them using HLS, DA
 - 🔄 Multiple media format support for packaging (output layout):
   - **HLS**: `playlist.m3u8` + `*.ts` segments
   - **DASH**: `playlist.mpd` + fragmented MP4 (`*.m4s`, `init-*.mp4`) segments
-  - **CMAF**: CMAF-compatible fragmented MP4 segments that can be exposed as HLS(DASH) playlists
+  - **CMAF**: CMAF (Common Media Application Format) fragmented MP4 – 공통 fMP4 자산을 만들어 두고, 이를 HLS나 DASH 매니페스트에서 재사용할 수 있는 형식
   - **RTSP (TS)**: MPEG‑TS over RTSP for low-latency streaming
 - 🌐 Streaming protocols:
   - HLS (HTTP Live Streaming)
@@ -92,7 +92,7 @@ A powerful web application for uploading videos and streaming them using HLS, DA
    - Select the desired **media format** (패키징 방식)
      - `hls`  → HLS: `m3u8 + TS` 세그먼트
      - `dash` → DASH: `mpd + fMP4` 세그먼트
-     - `cmaf` → CMAF 기반(HLS/DASH 겸용) 패키징
+     - `cmaf` → CMAF 기반 패키징 (공통 fMP4 세그먼트를 생성하고, 이를 HLS/DASH에서 사용할 수 있음)
      - `ts`   → TS 기반 패키징 (내부적으로 HLS 파이프라인을 사용, 주로 RTSP와 조합)
    - The compatible streaming protocols will be automatically enabled/disabled
    - Choose **Segment Duration** (seconds) for generated chunks
@@ -291,7 +291,7 @@ GET /api/v1/chunks/1?chunk_name=playlist.m3u8&chunk_type=hls
 | HLS (`hls`) – `m3u8 + TS`            | O          | X                 | X    |
 | DASH (`dash`) – `mpd + fMP4`         | X          | O                 | X    |
 | TS (`ts`) – MPEG‑TS segments         | X          | X                 | O*   |
-| CMAF (`cmaf`) – CMAF fMP4 segments   | O (HLS-CMAF) | O (DASH-CMAF)   | X    |
+| CMAF (`cmaf`) – CMAF fMP4 segments   | O (HLS에서 사용 가능) | O (DASH에서 사용 가능) | X    |
 
 `*` TS 포맷은 내부적으로 HLS 파이프라인을 사용하지만, 주 사용 목적은 RTSP(MPEG‑TS over RTSP)와의 조합입니다.
 
