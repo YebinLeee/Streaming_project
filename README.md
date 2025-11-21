@@ -85,6 +85,62 @@ A powerful web application for uploading videos and streaming them using HLS, DA
    http://localhost:8000
    ```
 
+## API Overview
+
+- **Base URL**: `http://localhost:8000`
+- **API base prefix**: `/api/v1`
+- **Interactive docs (Swagger)**: `GET /docs`
+
+### Upload API
+
+| 항목 | 내용 |
+|------|------|
+| **HTTP Method** | `POST` |
+| **URL** | `/api/v1/upload/` |
+| **Request Body (form-data)** | `file` (MP4 파일, 필수)  ·  `media_format` = `hls` \| `ts` \| `cmaf` \| `dash`  ·  `streaming_protocol` = `hls` \| `dash` \| `rtsp`  ·  `segment_duration` (int, 기본값 6)  ·  `crf` (int, 기본값 20)  ·  `resolution` = `source` \| `360p` \| `720p` \| `1080p` |
+| **Success Response (200)** | JSON 객체: `task_id` (작업 ID), `status` (예: `processing`), `output_path` (출력 파일/플레이리스트 경로), `stream_url` (`/api/v1/stream/{task_id}`), `status_url` (`/api/v1/tasks/{task_id}`) |
+
+### Task APIs
+
+#### 단일 작업 상태 조회
+
+| 항목 | 내용 |
+|------|------|
+| **HTTP Method** | `GET` |
+| **URL** | `/api/v1/tasks/{task_id}` |
+| **Path Params** | `task_id` (int) – 업로드/변환 작업 ID |
+| **Success Response (200)** | JSON 객체: `task_id`, `status`, `progress`, `error`, `stream_url` |
+
+#### 작업 리스트 조회
+
+| 항목 | 내용 |
+|------|------|
+| **HTTP Method** | `GET` |
+| **URL** | `/api/v1/tasks/` |
+| **Query Params** | 없음 |
+| **Success Response (200)** | 작업별 `task_id`, `status`, `filename`, `created_at` 를 담은 리스트 |
+
+### Streaming APIs
+
+#### 스트림 정보 조회
+
+| 항목 | 내용 |
+|------|------|
+| **HTTP Method** | `GET` |
+| **URL** | `/api/v1/stream/{task_id}` |
+| **Path Params** | `task_id` (int) – 업로드/변환 작업 ID |
+| **Success Response (200)** | JSON 객체: `hls_url`, `dash_url`, `rtsp_url`, `streaming_protocol` (`hls`/`dash`/`rtsp`), `status` |
+
+#### 세그먼트(Chunk) 파일 조회
+
+| 항목 | 내용 |
+|------|------|
+| **HTTP Method** | `GET` |
+| **URL** | `/api/v1/chunks/{task_id}` |
+| **Path Params** | `task_id` (int) – 업로드/변환 작업 ID |
+| **Query Params** | `chunk_name` (예: `playlist.m3u8`, `segment_000.ts`, `playlist.mpd` 등), `chunk_type` = `hls` \| `dash` |
+| **Success Response (200)** | 요청한 미디어 조각 파일 (`FileResponse`) |
+
 ## Usage
 
 1. **Upload Video**

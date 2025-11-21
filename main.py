@@ -6,8 +6,6 @@ The actual FastAPI app is defined in app.py
 """
 import uvicorn
 from app import app
-        return {"type": "rtsp", "url": rtsp_url, "stream_id": stream_id}
-    return None
 
 async def start_rtsp_stream(input_path: str, stream_id: str):
     """Start an RTSP server for the given input file"""
