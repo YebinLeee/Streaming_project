@@ -148,7 +148,20 @@
 
 - **Base URL**: `http://localhost:8000`
 - **API base prefix**: `/api/v1`
-- **Swagger 문서**: `GET /docs`
+
+### API 엔드포인트 요약
+
+| 메소드 | 엔드포인트 | 설명 |
+|--------|------------|------|
+| `GET`  | `/docs`  | 인터랙티브 API 문서 (Swagger UI) |
+| `GET`  | `/health` | 서버 상태 확인 엔드포인트 |
+| `POST` | `/api/v1/upload/` | 비디오 파일 업로드 및 변환 |
+| `GET`  | `/api/v1/tasks/` | 모든 변환 작업 목록 조회 |
+| `GET`  | `/api/v1/tasks/{task_id}` | 특정 작업의 상태 조회 |
+| `GET`  | `/api/v1/stream/{task_id}` | 작업의 스트림 정보 조회 |
+| `GET`  | `/api/v1/chunks/{task_id}` | 스트림의 특청 청크/세그먼트 조회 |
+
+### 상세 엔드포인트 문서
 
 ### Upload API
 

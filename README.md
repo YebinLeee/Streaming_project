@@ -137,7 +137,20 @@ A web application for uploading video files and streaming them via HLS, MPEG‑D
 
 - **Base URL**: `http://localhost:8000`
 - **API base prefix**: `/api/v1`
-- **Interactive docs (Swagger)**: `GET /docs`
+
+### API Endpoints at a Glance
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET`  | `/docs`  | Interactive API documentation (Swagger UI) |
+| `GET`  | `/health` | Health check endpoint |
+| `POST` | `/api/v1/upload/` | Upload and convert video file |
+| `GET`  | `/api/v1/tasks/` | List all conversion tasks |
+| `GET`  | `/api/v1/tasks/{task_id}` | Get status of a specific task |
+| `GET`  | `/api/v1/stream/{task_id}` | Get stream info for a task |
+| `GET`  | `/api/v1/chunks/{task_id}` | Get a specific chunk/segment of a stream |
+
+### Detailed Endpoint Documentation
 
 ### Upload API
 
